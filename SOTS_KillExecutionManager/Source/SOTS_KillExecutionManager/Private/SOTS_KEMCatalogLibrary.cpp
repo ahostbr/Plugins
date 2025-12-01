@@ -2,9 +2,10 @@
 
 #include "Engine/GameInstance.h"
 #include "SOTS_KEM_ManagerSubsystem.h"
+#include "SOTS_KEM_ExecutionCatalog.h"
 #include "UObject/SoftObjectPath.h"
 
-USOTS_KEM_ExecutionRegistryConfig* USOTS_KEMCatalogLibrary::GetExecutionCatalog(const UObject* WorldContextObject)
+USOTS_KEM_ExecutionCatalog* USOTS_KEMCatalogLibrary::GetExecutionCatalog(const UObject* WorldContextObject)
 {
     if (!WorldContextObject)
     {
@@ -29,14 +30,14 @@ USOTS_KEM_ExecutionRegistryConfig* USOTS_KEMCatalogLibrary::GetExecutionCatalog(
         return nullptr;
     }
 
-    if (Manager->DefaultRegistryConfig.IsValid())
+    if (Manager->ExecutionCatalog.IsValid())
     {
-        return Manager->DefaultRegistryConfig.Get();
+        return Manager->ExecutionCatalog.Get();
     }
 
-    if (Manager->DefaultRegistryConfig.ToSoftObjectPath().IsValid())
+    if (Manager->ExecutionCatalog.ToSoftObjectPath().IsValid())
     {
-        return Manager->DefaultRegistryConfig.LoadSynchronous();
+        return Manager->ExecutionCatalog.LoadSynchronous();
     }
 
     return nullptr;

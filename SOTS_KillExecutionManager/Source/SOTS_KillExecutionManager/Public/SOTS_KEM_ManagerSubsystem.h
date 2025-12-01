@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/GameInstance.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "GameplayTagContainer.h"
 #include "SOTS_KEM_Types.h"
@@ -15,6 +16,7 @@ struct FSOTS_AbilityRequirementCheckResult;
 class UContextualAnimSceneAsset;
 class ASOTS_KEMExecutionAnchor;
 class UAnimMontage;
+class USOTS_KEM_ExecutionCatalog;
 
 USTRUCT(BlueprintType)
 struct FSOTS_KEMAnchorDebugInfo
@@ -86,8 +88,10 @@ class SOTS_KILLEXECUTIONMANAGER_API USOTS_KEMManagerSubsystem : public UGameInst
 public:
     USOTS_KEMManagerSubsystem();
 
-    // Gameplay-friendly entry points keep the BP API surface small.
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM", meta=(WorldContext="WorldContextObject"))
+    static USOTS_KEMManagerSubsystem* Get(const UObject* WorldContextObject);
+
+    // Gameplay-friendly entry points keep the BP API surface small.
     bool RequestExecution(const UObject* WorldContextObject,
                           AActor* Instigator,
                           AActor* Target,
@@ -104,7 +108,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM")
     bool RequestExecution_FromCinematic(AActor* Instigator, AActor* Target, UObject* ExecutionDefinitionOverride);
 
-    // Input wiring reminder: Interact/Dragon input should map to the above nodes so the "3 allowed entrypoints" rule stays visible.
+    // Input wiring reminder (player input blueprints): Interact triggers RequestExecution_FromPlayer, Dragon input triggers RequestExecution_FromDragon so the "3 allowed entrypoints" rule stays visible.
 
     // Debug helper, logs why definitions passed/failed
     UFUNCTION(BlueprintCallable, Category="KEM|Debug", meta=(WorldContext="WorldContextObject"))
@@ -112,6 +116,9 @@ public:
                      AActor* Instigator,
                      AActor* Target,
                      const FGameplayTagContainer& ContextTags) const;
+
+    UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Validation")
+    FSOTS_KEMValidationResult ValidateExecutionDefinition(const USOTS_KEM_ExecutionDefinition* Def) const;
 
     UFUNCTION(Exec)
     void KEM_SelfTest();
@@ -147,12 +154,13 @@ public:
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Debug")
     void GetLastKEMDecisionSummary(FString& OutSummary) const;
 
+    // Candidate entries encode ExecutionName, status, score, and reject/failure reason for the last selection.
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Debug")
-    void GetLastKEMCandidateStrings(TArray<FString>& OutCandidates) const;
+    void GetLastKEMCandidates(TArray<FString>& OutCandidates) const;
 
     // Called externally when an execution fully ends (e.g. CAS montage finished, helper destroyed).
     // This drives the SuccessCooldown / FailureCooldown state before returning to Ready.
-    UFUNCTION(BlueprintCallable, Category="KEM")
+    UFUNCTION(BlueprintCallable, Category="KEM", meta=(BlueprintInternalUseOnly="true"))
     void NotifyExecutionEnded(bool bSuccess);
 
     // Backend-agnostic lifecycle hook that includes the execution context
@@ -164,11 +172,11 @@ public:
                               bool bWasSuccessful);
 
     // Emergency escape hatch to reset the state machine back to Ready (clears any cooldown).
-    UFUNCTION(BlueprintCallable, Category="KEM")
+    UFUNCTION(BlueprintCallable, Category="KEM", meta=(BlueprintInternalUseOnly="true"))
     void ForceResetState();
 
     // Optional runtime setter for the shared ability requirement library.
-    UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Ability")
+    UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Ability", meta=(BlueprintInternalUseOnly="true"))
     void SetAbilityRequirementLibrary(USOTS_AbilityRequirementLibraryAsset* InLibrary);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|KEM|Gameplay")
@@ -184,6 +192,9 @@ public:
     // Execution definitions to evaluate. Soft so they can live in Content.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KEM")
     TArray<TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>> ExecutionDefinitions;
+
+    UPROPERTY(EditAnywhere, Config, Category="KEM")
+    TSoftObjectPtr<USOTS_KEM_ExecutionCatalog> ExecutionCatalog;
 
     // Optional ability requirement library used to resolve requirements by
     // AbilityRequirementTag. If null, definitions that opt into ability
@@ -331,7 +342,6 @@ protected:
                                   const USOTS_KEM_ExecutionDefinition* ExecutionOverride,
                                   const FString& SourceLabel);
 
-    FSOTS_KEMValidationResult ValidateExecutionDefinition(const USOTS_KEM_ExecutionDefinition* Def) const;
 
     void FindNearbyExecutionAnchors(AActor* Instigator,
                                     AActor* Target,
@@ -348,20 +358,20 @@ protected:
     // --- Registry helpers ---
 
     // Register a single execution definition under a given ID (usually the ExecutionTag's name).
-    UFUNCTION(BlueprintCallable, Category="KEM|Registry")
+    UFUNCTION(BlueprintCallable, Category="KEM|Registry", meta=(BlueprintInternalUseOnly="true"))
     void RegisterExecutionDefinition(FName ExecutionId, USOTS_KEM_ExecutionDefinition* Definition);
 
     // Register all definitions from a registry config asset. This will rebuild both the array
     // used by RequestExecution and the internal ID map.
-    UFUNCTION(BlueprintCallable, Category="KEM|Registry")
+    UFUNCTION(BlueprintCallable, Category="KEM|Registry", meta=(BlueprintInternalUseOnly="true"))
     void RegisterExecutionDefinitionsFromConfig(USOTS_KEM_ExecutionRegistryConfig* Config);
 
     // Convenience helper that loads DefaultRegistryConfig and calls RegisterExecutionDefinitionsFromConfig.
-    UFUNCTION(BlueprintCallable, Category="KEM|Registry")
+    UFUNCTION(BlueprintCallable, Category="KEM|Registry", meta=(BlueprintInternalUseOnly="true"))
     void InitializeFromDefaultRegistryConfig();
 
     // Direct lookup of a definition by its registered ID.
-    UFUNCTION(BlueprintCallable, Category="KEM|Registry")
+    UFUNCTION(BlueprintCallable, Category="KEM|Registry", meta=(BlueprintInternalUseOnly="true"))
     USOTS_KEM_ExecutionDefinition* FindExecutionDefinitionById(FName ExecutionId);
 
 public:

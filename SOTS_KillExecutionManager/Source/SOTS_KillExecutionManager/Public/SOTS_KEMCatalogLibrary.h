@@ -4,7 +4,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "SOTS_KEMCatalogLibrary.generated.h"
 
-class USOTS_KEM_ExecutionRegistryConfig;
+class USOTS_KEM_ExecutionCatalog;
 class UObject;
 
 UCLASS()
@@ -14,5 +14,5 @@ class SOTS_KILLEXECUTIONMANAGER_API USOTS_KEMCatalogLibrary : public UBlueprintF
 
 public:
     UFUNCTION(BlueprintPure, Category="SOTS|KEM", meta=(WorldContext="WorldContextObject"))
-    static USOTS_KEM_ExecutionRegistryConfig* GetExecutionCatalog(const UObject* WorldContextObject);
+    static USOTS_KEM_ExecutionCatalog* GetExecutionCatalog(const UObject* WorldContextObject);
 };

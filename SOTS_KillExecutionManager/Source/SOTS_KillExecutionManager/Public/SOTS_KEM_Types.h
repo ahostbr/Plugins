@@ -15,6 +15,7 @@
 
 class UContextualAnimSceneAsset;
 
+// ExecutionFamily is design language that complements PositionTag without replacing it.
 UENUM(BlueprintType)
 enum class ESOTS_KEM_BackendType : uint8
 {
@@ -53,20 +54,21 @@ enum class ESOTS_KEM_ExecutionResult : uint8
 UENUM(BlueprintType)
 enum class ESOTS_KEM_ExecutionFamily : uint8
 {
-    Unknown         UMETA(DisplayName="Unknown"),
-    GroundRear      UMETA(DisplayName="Ground Rear"),
-    GroundFront     UMETA(DisplayName="Ground Front"),
-    GroundLeft      UMETA(DisplayName="Ground Left"),
-    GroundRight     UMETA(DisplayName="Ground Right"),
-    VerticalAbove   UMETA(DisplayName="Vertical Above"),
-    VerticalBelow   UMETA(DisplayName="Vertical Below"),
-    DropPoint       UMETA(DisplayName="Drop Point"),
-    PullDown        UMETA(DisplayName="Pull Down"),
-    Cinematic       UMETA(DisplayName="Cinematic"),
-    CornerRear      UMETA(DisplayName="Corner Rear"),
-    CornerFront     UMETA(DisplayName="Corner Front"),
-    CornerLeft      UMETA(DisplayName="Corner Left"),
-    CornerRight     UMETA(DisplayName="Corner Right")
+    Unknown      UMETA(DisplayName="Unknown"),
+
+    GroundRear   UMETA(DisplayName="Ground Rear Basic"),
+    GroundFront  UMETA(DisplayName="Ground Front"),
+    GroundLeft   UMETA(DisplayName="Ground Left"),
+    GroundRight  UMETA(DisplayName="Ground Right"),
+
+    VerticalAbove UMETA(DisplayName="Vertical Above (Drop)"),
+    VerticalBelow UMETA(DisplayName="Vertical Below (Pull)"),
+
+    CornerLeft   UMETA(DisplayName="Corner Left"),
+    CornerRight  UMETA(DisplayName="Corner Right"),
+
+    // Extend later with weapon/stance variations if needed.
+    Special      UMETA(DisplayName="Special / Cinematic")
 };
 
 UENUM(BlueprintType)
@@ -570,7 +572,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Selection")
     FGameplayTag PositionTag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Selection")
+    // ExecutionFamily groups executions into design archetypes (e.g. GroundRear,
+    // VerticalAbove, CornerLeft). This is used for coverage checks and balancing.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Execution|Design")
     ESOTS_KEM_ExecutionFamily ExecutionFamily = ESOTS_KEM_ExecutionFamily::Unknown;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Selection")

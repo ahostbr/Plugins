@@ -8,6 +8,15 @@ FSOTS_KEMValidationResult USOTS_KEM_ExecutionDefinition::ValidateDefinition() co
     // DevTools: Python coverage tools can call ValidateDefinition() indirectly
     // via logs or debug commands, so keep messages deterministic and short.
 
+    if (ExecutionFamily == ESOTS_KEM_ExecutionFamily::Unknown)
+    {
+        Result.AddWarning(TEXT("ExecutionFamily is Unknown."));
+    }
+    if (!PositionTag.IsValid())
+    {
+        Result.AddWarning(TEXT("PositionTag is not set."));
+    }
+
     if (!ExecutionTag.IsValid())
     {
         Result.AddWarning(TEXT("ExecutionTag is not set."));
@@ -21,6 +30,11 @@ FSOTS_KEMValidationResult USOTS_KEM_ExecutionDefinition::ValidateDefinition() co
     switch (BackendType)
     {
     case ESOTS_KEM_BackendType::SpawnActor:
+        if (WarpPoints.Num() == 0)
+        {
+            Result.AddWarning(TEXT("SpawnActor backend has no warp points configured."));
+        }
+
         if (!SpawnActorConfig.ExecutionData.IsValid() &&
             !SpawnActorConfig.ExecutionData.ToSoftObjectPath().IsValid())
         {
@@ -40,6 +54,11 @@ FSOTS_KEMValidationResult USOTS_KEM_ExecutionDefinition::ValidateDefinition() co
                 {
                     Result.AddWarning(TEXT("SpawnExecutionData lacks instigator warp points."));
                 }
+
+                if (!SpawnData->InstigatorMontage && !SpawnData->TargetMontage)
+                {
+                    Result.AddWarning(TEXT("SpawnExecutionData has no montages configured."));
+                }
             }
         }
         break;
@@ -53,6 +72,11 @@ FSOTS_KEMValidationResult USOTS_KEM_ExecutionDefinition::ValidateDefinition() co
         if (!CASConfig.Scene.IsValid() && !CASConfig.Scene.ToSoftObjectPath().IsValid())
         {
             Result.AddWarning(TEXT("CAS Scene asset is not configured."));
+        }
+
+        if (CASConfig.SectionName.IsNone())
+        {
+            Result.AddWarning(TEXT("CAS SectionName is not set."));
         }
         break;
 

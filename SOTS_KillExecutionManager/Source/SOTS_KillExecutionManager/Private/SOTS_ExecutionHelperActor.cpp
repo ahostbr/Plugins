@@ -49,14 +49,18 @@ void ASOTS_ExecutionHelperActor::Initialize(const FSOTS_ExecutionContext& InCont
 void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
 {
     // Default behavior:
-    // - If WarpResult has a valid warp target, use that to position the instigator.
-    // - Else, resolve ExecutionDefinition warp points (Instigator first, then target).
-    // - Blueprint overrides can perform deeper layout tweaks after the parent logic runs.
+    // - If WarpResult has a valid runtime warp target, register it with the instigator first.
+    // - Else, resolve ExecutionDefinition warp points using SpawnData's candidate names (instigator first, then target).
+    // - Optionally nudge a configured target warp point into place before montages start.
+    // Blueprint authors: call the parent implementation first to ensure default warp placement is applied before adjusting per-execution details.
 
     if (!ExecutionDefinition || !SpawnData)
     {
         return;
     }
+
+    AActor* Instigator = Context.Instigator.Get();
+    AActor* Target = Context.Target.Get();
 
     UWorld* World = GetWorld();
     if (!World)
@@ -71,7 +75,7 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
     }
 
     bool bAppliedWarpResult = false;
-    if (WarpResult.WarpTargets.Num() > 0 && Context.Instigator.IsValid())
+    if (Instigator && WarpResult.WarpTargets.Num() > 0)
     {
         const FName PreferredWarpPoint = SpawnData->InstigatorWarpPointNames.Num() > 0
             ? SpawnData->InstigatorWarpPointNames[0]
@@ -91,9 +95,14 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
             ChosenTarget = &WarpResult.WarpTargets[0];
         }
 
-        auto ApplyWarpTarget = [&](const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget) -> bool
+        auto RegisterWarpTarget = [&](const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget) -> bool
         {
-            if (UMotionWarpingComponent* MotionWarp = Context.Instigator->FindComponentByClass<UMotionWarpingComponent>())
+            if (!Instigator)
+            {
+                return false;
+            }
+
+            if (UMotionWarpingComponent* MotionWarp = Instigator->FindComponentByClass<UMotionWarpingComponent>())
             {
                 MotionWarp->AddOrUpdateWarpTargetFromTransform(RuntimeTarget.TargetName, RuntimeTarget.TargetTransform);
                 return true;
@@ -101,15 +110,14 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
             return false;
         };
 
-        if (ChosenTarget && ApplyWarpTarget(*ChosenTarget))
+        if (ChosenTarget && RegisterWarpTarget(*ChosenTarget))
         {
             bAppliedWarpResult = true;
         }
 
-        // Ensure all runtime targets are registered for motion warping.
         for (const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget : WarpResult.WarpTargets)
         {
-            ApplyWarpTarget(RuntimeTarget);
+            RegisterWarpTarget(RuntimeTarget);
         }
     }
 
@@ -126,43 +134,53 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
 
     if (USOTS_KEMManagerSubsystem* Subsystem = GameInstance->GetSubsystem<USOTS_KEMManagerSubsystem>())
     {
-        const auto TryApplyWarpPoints = [&](const TArray<FName>& Candidates, TWeakObjectPtr<AActor> ActorPtr)
+        const auto TryResolveWarpPoints = [&](const TArray<FName>& Candidates, AActor* Actor, bool bTransformActor) -> bool
         {
-            AActor* Actor = ActorPtr.Get();
             if (!Actor)
             {
                 return false;
             }
 
-            if (UMotionWarpingComponent* MotionWarp = Actor->FindComponentByClass<UMotionWarpingComponent>())
+            if (Candidates.Num() == 0)
             {
-                for (const FName& CandidateName : Candidates)
+                return false;
+            }
+
+            for (const FName& CandidateName : Candidates)
+            {
+                if (CandidateName.IsNone())
                 {
-                    if (CandidateName.IsNone())
-                    {
-                        continue;
-                    }
-
-                    FTransform WarpTransform;
-                    if (!Subsystem->ResolveWarpPointByName(ExecutionDefinition, CandidateName, Context, WarpTransform))
-                    {
-                        continue;
-                    }
-
-                    MotionWarp->AddOrUpdateWarpTargetFromTransform(CandidateName, WarpTransform);
-                    return true;
+                    continue;
                 }
+
+                FTransform WarpTransform;
+                if (!Subsystem->ResolveWarpPointByName(ExecutionDefinition, CandidateName, Context, WarpTransform))
+                {
+                    continue;
+                }
+
+                if (UMotionWarpingComponent* MotionWarp = Actor->FindComponentByClass<UMotionWarpingComponent>())
+                {
+                    MotionWarp->AddOrUpdateWarpTargetFromTransform(CandidateName, WarpTransform);
+                }
+
+                if (bTransformActor)
+                {
+                    Actor->SetActorTransform(WarpTransform);
+                }
+
+                return true;
             }
 
             return false;
         };
 
-        if (TryApplyWarpPoints(SpawnData->InstigatorWarpPointNames, Context.Instigator))
+        if (TryResolveWarpPoints(SpawnData->InstigatorWarpPointNames, Instigator, false))
         {
             return;
         }
 
-        TryApplyWarpPoints(SpawnData->TargetWarpPointNames, Context.Target);
+        TryResolveWarpPoints(SpawnData->TargetWarpPointNames, Target, true);
     }
 }
 

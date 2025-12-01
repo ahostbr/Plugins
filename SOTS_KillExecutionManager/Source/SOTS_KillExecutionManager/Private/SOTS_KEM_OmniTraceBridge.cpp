@@ -258,11 +258,7 @@ static EOmniTraceKEMExecutionFamily ConvertExecutionFamily(ESOTS_KEM_ExecutionFa
         return EOmniTraceKEMExecutionFamily::VerticalAbove;
     case ESOTS_KEM_ExecutionFamily::VerticalBelow:
         return EOmniTraceKEMExecutionFamily::VerticalBelow;
-    case ESOTS_KEM_ExecutionFamily::DropPoint:
-        return EOmniTraceKEMExecutionFamily::DropPoint;
-    case ESOTS_KEM_ExecutionFamily::PullDown:
-        return EOmniTraceKEMExecutionFamily::PullDown;
-    case ESOTS_KEM_ExecutionFamily::Cinematic:
+    case ESOTS_KEM_ExecutionFamily::Special:
         return EOmniTraceKEMExecutionFamily::Cinematic;
     default:
         return EOmniTraceKEMExecutionFamily::Unknown;

@@ -3,6 +3,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "SOTS_KEMCatalogLibrary.h"
+#include "SOTS_KEM_ExecutionCatalog.h"
 #include "SOTS_KillExecutionManagerModule.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -86,20 +87,20 @@ namespace
             return FLinearColor::Red;
         case ESOTS_KEM_ExecutionFamily::GroundFront:
             return FLinearColor::Green;
+        case ESOTS_KEM_ExecutionFamily::GroundLeft:
+            return FLinearColor(1.0f, 0.7f, 0.0f);
+        case ESOTS_KEM_ExecutionFamily::GroundRight:
+            return FLinearColor(0.0f, 0.75f, 0.75f);
         case ESOTS_KEM_ExecutionFamily::VerticalAbove:
             return FLinearColor::Blue;
         case ESOTS_KEM_ExecutionFamily::VerticalBelow:
             return FLinearColor(0.6f, 0.2f, 0.7f);
-        case ESOTS_KEM_ExecutionFamily::DropPoint:
-            return FLinearColor::Yellow;
-        case ESOTS_KEM_ExecutionFamily::PullDown:
-            return FLinearColor(0.0f, 0.75f, 0.75f);
-        case ESOTS_KEM_ExecutionFamily::Cinematic:
-            return FLinearColor(1.0f, 0.55f, 0.0f);
-        case ESOTS_KEM_ExecutionFamily::CornerRear:
+        case ESOTS_KEM_ExecutionFamily::CornerLeft:
             return FLinearColor(1.0f, 0.2f, 0.65f);
-        case ESOTS_KEM_ExecutionFamily::CornerFront:
+        case ESOTS_KEM_ExecutionFamily::CornerRight:
             return FLinearColor(0.8f, 0.4f, 0.2f);
+        case ESOTS_KEM_ExecutionFamily::Special:
+            return FLinearColor(1.0f, 0.55f, 0.0f);
         default:
             return FLinearColor::White;
         }
@@ -244,49 +245,98 @@ namespace
             AddSoftDefinition(SoftDef);
         }
 
-        if (USOTS_KEM_ExecutionRegistryConfig* Catalog = USOTS_KEMCatalogLibrary::GetExecutionCatalog(Manager))
+        if (USOTS_KEM_ExecutionCatalog* Catalog = USOTS_KEMCatalogLibrary::GetExecutionCatalog(Manager))
         {
-            for (const FSOTS_KEM_ExecutionRegistryEntry& Entry : Catalog->Entries)
+            for (const TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>& SoftDef : Catalog->ExecutionDefinitions)
+            {
+                AddSoftDefinition(SoftDef);
+            }
+        }
+
+        auto LoadDefaultRegistryConfig = [&]() -> USOTS_KEM_ExecutionRegistryConfig*
+        {
+            if (Manager->DefaultRegistryConfig.IsValid())
+            {
+                return Manager->DefaultRegistryConfig.Get();
+            }
+            if (Manager->DefaultRegistryConfig.ToSoftObjectPath().IsValid())
+            {
+                return Manager->DefaultRegistryConfig.LoadSynchronous();
+            }
+            return nullptr;
+        };
+
+        if (USOTS_KEM_ExecutionRegistryConfig* RegistryConfig = LoadDefaultRegistryConfig())
+        {
+            for (const FSOTS_KEM_ExecutionRegistryEntry& Entry : RegistryConfig->Entries)
             {
                 AddSoftDefinition(Entry.ExecutionDefinition);
             }
         }
     }
 
-    FString FormatValidationMessage(const FSOTS_KEMValidationResult& Result)
+    FString GetDefinitionDisplayName(const TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>& SoftDef, const USOTS_KEM_ExecutionDefinition* Def)
     {
-        FString Message = Result.bIsValid ? TEXT("Valid") : TEXT("Invalid");
-
-        if (Result.Errors.Num() > 0)
+        if (Def)
         {
-            Message += TEXT(" - ");
-            Message += Result.Errors[0];
-            if (Result.Errors.Num() > 1)
+            if (Def->ExecutionTag.IsValid())
             {
-                Message += FString::Printf(TEXT(" (+%d more errors)"), Result.Errors.Num() - 1);
+                return Def->ExecutionTag.ToString();
             }
+            return Def->GetName();
         }
 
-        if (Result.Warnings.Num() > 0)
+        if (SoftDef.IsValid())
         {
-            const FString WarningsText = FString::Join(Result.Warnings, TEXT("; "));
-            Message += TEXT(" (Warnings: ");
-            Message += WarningsText;
-            Message += TEXT(")");
+            const FString AssetName = SoftDef.GetAssetName();
+            if (!AssetName.IsEmpty())
+            {
+                return AssetName;
+            }
+            return SoftDef.ToSoftObjectPath().ToString();
         }
 
-        return Message;
+        const FString Path = SoftDef.ToSoftObjectPath().ToString();
+        return Path.IsEmpty() ? TEXT("UnknownExecutionDefinition") : Path;
     }
 
-    FString TagToStringOrDefault(const FGameplayTag& Tag, const TCHAR* DefaultValue)
+    FString GetExecutionFamilyName(ESOTS_KEM_ExecutionFamily Family)
     {
-        return Tag.IsValid() ? Tag.ToString() : FString(DefaultValue);
+        if (const UEnum* Enum = StaticEnum<ESOTS_KEM_ExecutionFamily>())
+        {
+            return Enum->GetNameStringByValue(static_cast<int64>(Family));
+        }
+        return TEXT("Unknown");
     }
 }
 
 USOTS_KEMManagerSubsystem::USOTS_KEMManagerSubsystem()
 {
     CurrentState = ESOTS_KEMState::Ready;
+}
+
+USOTS_KEMManagerSubsystem* USOTS_KEMManagerSubsystem::Get(const UObject* WorldContextObject)
+{
+    if (!WorldContextObject)
+    {
+        return nullptr;
+    }
+
+    const UGameInstance* GameInstance = WorldContextObject->GetGameInstance();
+    if (!GameInstance)
+    {
+        if (const UWorld* World = WorldContextObject->GetWorld())
+        {
+            GameInstance = World->GetGameInstance();
+        }
+    }
+
+    if (!GameInstance)
+    {
+        return nullptr;
+    }
+
+    return GameInstance->GetSubsystem<USOTS_KEMManagerSubsystem>();
 }
 
 void USOTS_KEMManagerSubsystem::SetAbilityRequirementLibrary(USOTS_AbilityRequirementLibraryAsset* InLibrary)
@@ -343,7 +393,7 @@ void USOTS_KEMManagerSubsystem::GetLastKEMDecisionSummary(FString& OutSummary) c
         SelectedScore);
 }
 
-void USOTS_KEMManagerSubsystem::GetLastKEMCandidateStrings(TArray<FString>& OutCandidates) const
+void USOTS_KEMManagerSubsystem::GetLastKEMCandidates(TArray<FString>& OutCandidates) const
 {
     OutCandidates.Reset();
     OutCandidates.Reserve(LastCandidateDebug.Num());
@@ -992,10 +1042,19 @@ FSOTS_KEMValidationResult USOTS_KEMManagerSubsystem::ValidateExecutionDefinition
 
     Result = Def->ValidateDefinition();
 
-    if (Def->BackendType == ESOTS_KEM_BackendType::SpawnActor &&
-        Def->WarpPoints.Num() == 0)
+    const ESOTS_KEM_PositionKind PositionKind = Def->GetPositionKind();
+
+    if (Def->ExecutionFamily != ESOTS_KEM_ExecutionFamily::Unknown &&
+        PositionKind == ESOTS_KEM_PositionKind::Unknown &&
+        Def->PositionTag.IsValid())
     {
-        Result.AddWarning(TEXT("SpawnActor execution has no warp points defined."));
+        Result.AddWarning(TEXT("ExecutionFamily set but PositionTag is not recognized."));
+    }
+
+    if (Def->ExecutionFamily == ESOTS_KEM_ExecutionFamily::Unknown &&
+        PositionKind != ESOTS_KEM_PositionKind::Unknown)
+    {
+        Result.AddWarning(TEXT("PositionTag is set but ExecutionFamily is Unknown."));
     }
 
     return Result;
@@ -2125,117 +2184,157 @@ void USOTS_KEMManagerSubsystem::DrawAnchorDebugVisualization(AActor* CenterActor
     }
 }
 
+// DevTools: KEM Python coverage tools may parse the log output of KEM_SelfTest and KEM_DumpCoverage for CI-style checks.
 void USOTS_KEMManagerSubsystem::KEM_SelfTest()
 {
-    TArray<USOTS_KEM_ExecutionDefinition*> Definitions;
-    GatherExecutionDefinitions(this, Definitions);
-
-    if (Definitions.IsEmpty())
+    UWorld* World = GetWorld();
+    if (!World)
     {
-        UE_LOG(LogSOTSKEM, Warning, TEXT("KEM_SelfTest: No execution definitions found."));
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_SelfTest: No World."));
+        return;
     }
 
-    int32 Total = 0;
-    int32 Valid = 0;
-    int32 Invalid = 0;
-
-    for (USOTS_KEM_ExecutionDefinition* Def : Definitions)
+    USOTS_KEM_ExecutionCatalog* Catalog = USOTS_KEMCatalogLibrary::GetExecutionCatalog(World);
+    if (!Catalog)
     {
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_SelfTest: No ExecutionCatalog found."));
+        return;
+    }
+
+    if (Catalog->ExecutionDefinitions.IsEmpty())
+    {
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_SelfTest: ExecutionCatalog contains no definitions."));
+    }
+
+    TMap<FString, FSOTS_KEMValidationResult> Results;
+    for (const TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>& SoftDef : Catalog->ExecutionDefinitions)
+    {
+        USOTS_KEM_ExecutionDefinition* Def = SoftDef.LoadSynchronous();
+        const FString EntryName = GetDefinitionDisplayName(SoftDef, Def);
+
         if (!Def)
+        {
+            FSOTS_KEMValidationResult InvalidResult;
+            InvalidResult.AddError(TEXT("Failed to load definition."));
+            Results.Add(EntryName, InvalidResult);
+            continue;
+        }
+
+        Results.Add(EntryName, ValidateExecutionDefinition(Def));
+    }
+
+    const int32 Total = Results.Num();
+    int32 ValidCount = 0;
+    for (const auto& Pair : Results)
+    {
+        if (Pair.Value.bIsValid)
+        {
+            ++ValidCount;
+        }
+    }
+
+    UE_LOG(LogSOTS_KEM, Display,
+        TEXT("KEM_SelfTest: %d definitions, %d valid, %d invalid."),
+        Total, ValidCount, Total - ValidCount);
+
+    for (const auto& Pair : Results)
+    {
+        const FSOTS_KEMValidationResult& Result = Pair.Value;
+        if (Result.bIsValid && Result.Warnings.Num() == 0)
         {
             continue;
         }
 
-        ++Total;
-
-        FSOTS_KEMValidationResult Result = ValidateExecutionDefinition(Def);
-        if (Result.bIsValid)
+        UE_LOG(LogSOTS_KEM, Display, TEXT("  %s:"), *Pair.Key);
+        for (const FString& Error : Result.Errors)
         {
-            ++Valid;
+            UE_LOG(LogSOTS_KEM, Display, TEXT("    Error: %s"), *Error);
         }
-        else
+        for (const FString& Warning : Result.Warnings)
         {
-            ++Invalid;
+            UE_LOG(LogSOTS_KEM, Display, TEXT("    Warn:  %s"), *Warning);
         }
-
-        const FString DefName = Def->ExecutionTag.IsValid() ? Def->ExecutionTag.ToString() : Def->GetName();
-        const FString Message = FormatValidationMessage(Result);
-
-        UE_LOG(LogSOTSKEM, Log, TEXT("KEM_SelfTest: %s: %s"), *DefName, *Message);
     }
-
-    UE_LOG(LogSOTSKEM, Log,
-        TEXT("KEM_SelfTest: %d definitions, %d valid, %d invalid"),
-        Total, Valid, Invalid);
 }
 
 void USOTS_KEMManagerSubsystem::KEM_DumpCoverage()
 {
-    TArray<USOTS_KEM_ExecutionDefinition*> Definitions;
-    GatherExecutionDefinitions(this, Definitions);
-
-    if (Definitions.IsEmpty())
+    UWorld* World = GetWorld();
+    if (!World)
     {
-        UE_LOG(LogSOTSKEM, Warning, TEXT("KEM_DumpCoverage: No execution definitions available to report."));
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_DumpCoverage: No World."));
+        return;
+    }
+
+    USOTS_KEM_ExecutionCatalog* Catalog = USOTS_KEMCatalogLibrary::GetExecutionCatalog(World);
+    if (!Catalog)
+    {
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_DumpCoverage: No ExecutionCatalog found."));
+        return;
+    }
+
+    if (Catalog->ExecutionDefinitions.IsEmpty())
+    {
+        UE_LOG(LogSOTS_KEM, Warning, TEXT("KEM_DumpCoverage: ExecutionCatalog contains no definitions."));
     }
 
     TMap<FString, int32> FamilyCounts;
     TMap<FString, int32> PositionCounts;
 
-    for (USOTS_KEM_ExecutionDefinition* Def : Definitions)
+    for (const TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>& SoftDef : Catalog->ExecutionDefinitions)
     {
+        USOTS_KEM_ExecutionDefinition* Def = SoftDef.LoadSynchronous();
         if (!Def)
         {
             continue;
         }
 
-        const FString FamilyName = TagToStringOrDefault(Def->ExecutionFamilyTag, TEXT("Uncategorized"));
+        const FString FamilyName = GetExecutionFamilyName(Def->ExecutionFamily);
         FamilyCounts.FindOrAdd(FamilyName) += 1;
 
-        TSet<FString> UniquePositions;
-        if (FGameplayTag Canonical = DetermineEffectivePositionTag(Def); Canonical.IsValid())
+        TSet<FString> PositionNames;
+        if (const FGameplayTag Effective = DetermineEffectivePositionTag(Def); Effective.IsValid())
         {
-            UniquePositions.Add(Canonical.ToString());
+            PositionNames.Add(Effective.ToString());
         }
-
         if (Def->PositionTag.IsValid())
         {
-            UniquePositions.Add(Def->PositionTag.ToString());
+            PositionNames.Add(Def->PositionTag.ToString());
         }
-
         for (const FGameplayTag& Additional : Def->AdditionalPositionTags)
         {
             if (Additional.IsValid())
             {
-                UniquePositions.Add(Additional.ToString());
+                PositionNames.Add(Additional.ToString());
             }
         }
-
-        if (UniquePositions.IsEmpty())
+        if (PositionNames.IsEmpty())
         {
-            UniquePositions.Add(TEXT("Unspecified"));
+            PositionNames.Add(TEXT("Unspecified"));
         }
-
-        for (const FString& PositionName : UniquePositions)
+        for (const FString& PositionName : PositionNames)
         {
             PositionCounts.FindOrAdd(PositionName) += 1;
         }
     }
 
+    UE_LOG(LogSOTS_KEM, Display, TEXT("[KEM Coverage]"));
+    UE_LOG(LogSOTS_KEM, Display, TEXT("Families:"));
     TArray<FString> FamilyKeys;
     FamilyCounts.GetKeys(FamilyKeys);
     FamilyKeys.Sort();
     for (const FString& Family : FamilyKeys)
     {
-        UE_LOG(LogSOTSKEM, Log, TEXT("KEM_DumpCoverage: [KEM Coverage] Family=%s Count=%d"), *Family, FamilyCounts[Family]);
+        UE_LOG(LogSOTS_KEM, Display, TEXT("  %s: %d"), *Family, FamilyCounts[Family]);
     }
 
+    UE_LOG(LogSOTS_KEM, Display, TEXT("Positions:"));
     TArray<FString> PositionKeys;
     PositionCounts.GetKeys(PositionKeys);
     PositionKeys.Sort();
     for (const FString& Position : PositionKeys)
     {
-        UE_LOG(LogSOTSKEM, Log, TEXT("KEM_DumpCoverage: [KEM Coverage] Position=%s Count=%d"), *Position, PositionCounts[Position]);
+        UE_LOG(LogSOTS_KEM, Display, TEXT("  %s: %d"), *Position, PositionCounts[Position]);
     }
 }
 
