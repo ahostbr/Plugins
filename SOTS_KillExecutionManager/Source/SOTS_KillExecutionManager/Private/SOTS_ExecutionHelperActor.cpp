@@ -18,6 +18,14 @@ void ASOTS_ExecutionHelperActor::Initialize(const FSOTS_ExecutionContext& InCont
                                             const USOTS_KEM_ExecutionDefinition* InExecutionDefinition,
                                             const FSOTS_KEM_OmniTraceWarpResult& InWarpResult)
 {
+    if (!InExecutionDefinition || !InData)
+    {
+        UE_LOG(LogSOTS_KEM, Warning,
+            TEXT("[KEM][Helper] Initialize aborted because ExecutionDefinition or SpawnData was null"));
+        Destroy();
+        return;
+    }
+
     Context = InContext;
     SpawnData = InData;
     SpawnTransform = InSpawnTransform;
@@ -40,6 +48,11 @@ void ASOTS_ExecutionHelperActor::Initialize(const FSOTS_ExecutionContext& InCont
 
 void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
 {
+    // Default behavior:
+    // - If WarpResult has a valid warp target, use that to position the instigator.
+    // - Else, resolve ExecutionDefinition warp points (Instigator first, then target).
+    // - Blueprint overrides can perform deeper layout tweaks after the parent logic runs.
+
     if (!ExecutionDefinition || !SpawnData)
     {
         return;
@@ -60,13 +73,43 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
     bool bAppliedWarpResult = false;
     if (WarpResult.WarpTargets.Num() > 0 && Context.Instigator.IsValid())
     {
-        if (UMotionWarpingComponent* MotionWarp = Context.Instigator->FindComponentByClass<UMotionWarpingComponent>())
+        const FName PreferredWarpPoint = SpawnData->InstigatorWarpPointNames.Num() > 0
+            ? SpawnData->InstigatorWarpPointNames[0]
+            : NAME_None;
+
+        const FSOTS_KEM_WarpRuntimeTarget* ChosenTarget = nullptr;
+        if (PreferredWarpPoint != NAME_None)
         {
-            for (const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget : WarpResult.WarpTargets)
+            ChosenTarget = WarpResult.WarpTargets.FindByPredicate([PreferredWarpPoint](const FSOTS_KEM_WarpRuntimeTarget& Entry)
+            {
+                return Entry.TargetName == PreferredWarpPoint;
+            });
+        }
+
+        if (!ChosenTarget)
+        {
+            ChosenTarget = &WarpResult.WarpTargets[0];
+        }
+
+        auto ApplyWarpTarget = [&](const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget) -> bool
+        {
+            if (UMotionWarpingComponent* MotionWarp = Context.Instigator->FindComponentByClass<UMotionWarpingComponent>())
             {
                 MotionWarp->AddOrUpdateWarpTargetFromTransform(RuntimeTarget.TargetName, RuntimeTarget.TargetTransform);
-                bAppliedWarpResult = true;
+                return true;
             }
+            return false;
+        };
+
+        if (ChosenTarget && ApplyWarpTarget(*ChosenTarget))
+        {
+            bAppliedWarpResult = true;
+        }
+
+        // Ensure all runtime targets are registered for motion warping.
+        for (const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget : WarpResult.WarpTargets)
+        {
+            ApplyWarpTarget(RuntimeTarget);
         }
     }
 
@@ -126,6 +169,24 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
 void ASOTS_ExecutionHelperActor::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (!ExecutionDefinition || !SpawnData)
+    {
+        UE_LOG(LogSOTS_KEM, Warning,
+            TEXT("[KEM][Helper] BeginPlay aborted due to missing ExecutionDefinition or SpawnData"));
+        NotifyExecutionEnded(false);
+        Destroy();
+        return;
+    }
+
+    if (!Context.Instigator.IsValid())
+    {
+        UE_LOG(LogSOTS_KEM, Warning,
+            TEXT("[KEM][Helper] BeginPlay aborted because Instigator is invalid"));
+        NotifyExecutionEnded(false);
+        Destroy();
+        return;
+    }
 
     // Give Blueprint a chance to do any spatial / warp work before we fire the montages.
     PrePlaySpawnMontages();

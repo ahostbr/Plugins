@@ -33,6 +33,8 @@ public:
     // The default implementation applies OmniTrace or authored warp point data
     // before the montages start; override in Blueprint only when you need
     // custom spatial logic beyond the builtin behavior.
+    // Blueprint authors: call the parent implementation first to ensure the
+    // default warp placement is applied before adding per-execution tweaks.
     UFUNCTION(BlueprintNativeEvent, Category="KEM|Spawn")
     void PrePlaySpawnMontages();
     virtual void PrePlaySpawnMontages_Implementation();

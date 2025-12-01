@@ -1,5 +1,7 @@
 #include "GameplayTagContainer.h"
 #include "SOTS_KEM_ManagerSubsystem.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "SOTS_KEMCatalogLibrary.h"
 #include "SOTS_KillExecutionManagerModule.h"
 #include "Engine/World.h"
@@ -889,10 +891,23 @@ bool USOTS_KEMManagerSubsystem::EvaluateSpawnDefinition(
         return false;
     }
 
-    if (!Cfg.ExecutionData.IsValid())
+    const USOTS_SpawnExecutionData* SpawnData = Cfg.ExecutionData.Get();
+    if (!SpawnData && Cfg.ExecutionData.IsValid())
+    {
+        SpawnData = Cfg.ExecutionData.LoadSynchronous();
+    }
+
+    if (!SpawnData)
     {
         OutRejectReason = ESOTS_KEMRejectReason::DataIncomplete;
         OutFailReason = TEXT("SpawnActor: ExecutionData is not set");
+        return false;
+    }
+
+    if (!SpawnData->InstigatorMontage)
+    {
+        OutRejectReason = ESOTS_KEMRejectReason::DataIncomplete;
+        OutFailReason = TEXT("SpawnActor: InstigatorMontage missing in ExecutionData");
         return false;
     }
 
@@ -984,6 +999,42 @@ FSOTS_KEMValidationResult USOTS_KEMManagerSubsystem::ValidateExecutionDefinition
     }
 
     return Result;
+}
+
+bool USOTS_KEMManagerSubsystem::TryPlayFallbackMontage(AActor* Instigator) const
+{
+    if (!FallbackMontage || !Instigator)
+    {
+        return false;
+    }
+
+    if (USkeletalMeshComponent* Mesh = Instigator->FindComponentByClass<USkeletalMeshComponent>())
+    {
+        if (UAnimInstance* Anim = Mesh->GetAnimInstance())
+        {
+            if (Anim->Montage_Play(FallbackMontage, 1.0f) > 0.f)
+            {
+                if (IsDebugAtLeast(EKEMDebugVerbosity::Basic))
+                {
+                    UE_LOG(LogSOTS_KEM, Log,
+                        TEXT("[KEM][Fallback] Played fallback montage '%s' for Instigator=%s"),
+                        *FallbackMontage->GetName(),
+                        *Instigator->GetName());
+                }
+                return true;
+            }
+        }
+    }
+
+    if (IsDebugAtLeast(EKEMDebugVerbosity::Basic))
+    {
+        UE_LOG(LogSOTS_KEM, Verbose,
+            TEXT("[KEM][Fallback] Unable to play montage '%s' on Instigator=%s"),
+            *FallbackMontage->GetName(),
+            *GetNameSafe(Instigator));
+    }
+
+    return false;
 }
 
 
@@ -1379,7 +1430,7 @@ bool USOTS_KEMManagerSubsystem::EvaluateDefinition(
     FSOTS_AbilityRequirementCheckResult AbilityReqResult;
     if (!EvaluateAbilityRequirementsForExecution(Context.Instigator.Get(), Def, AbilityReqResult))
     {
-        OutRejectReason = ESOTS_KEMRejectReason::Other;
+        OutRejectReason = ESOTS_KEMRejectReason::AbilityRequirementFailed;
         OutFailReason = FString::Printf(TEXT("Rejected by ability requirements: %s"),
             *USOTS_GAS_AbilityRequirementLibrary::DescribeAbilityRequirementCheckResult(AbilityReqResult).ToString());
 
@@ -1548,6 +1599,7 @@ bool USOTS_KEMManagerSubsystem::RequestExecutionInternal(
         ? FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(ForwardDir, ToTarget.GetSafeNormal()), -1.f, 1.f)))
         : 0.f;
     const float HeightDelta = ExecContext.HeightDelta;
+    const bool bWithinFallbackDistance = DistanceToTarget <= FallbackTriggerDistance;
 
     TArray<const USOTS_KEM_ExecutionDefinition*> CandidateDefinitions;
     CandidateDefinitions.Reserve(ExecutionDefinitions.Num() + (ExecutionOverride ? 1 : 0));
@@ -1629,36 +1681,17 @@ bool USOTS_KEMManagerSubsystem::RequestExecutionInternal(
 
         CandidateRecords.Add(Candidate);
 
-        if (IsDebugAtLeast(EKEMDebugVerbosity::Verbose))
+        if (IsDebugAtLeast(EKEMDebugVerbosity::Verbose) && AnchorBonus > 0.f && CandidateAnchor)
         {
-            const FString RejectName = RejectReasonEnum
-                ? RejectReasonEnum->GetNameStringByValue(static_cast<int64>(Candidate.RejectReason))
+            const FString FamilyName = ExecutionFamilyEnum
+                ? ExecutionFamilyEnum->GetNameStringByValue(static_cast<int64>(CandidateAnchor->GetExecutionFamily()))
                 : TEXT("Unknown");
-            const TCHAR* Status = bPassed ? TEXT("PASS") : TEXT("FAIL");
-            const FString CandidateMessage = FString::Printf(
-                TEXT("[KEM Candidate] %s Status=%s Score=%.2f Reject=%s Reason=%s Dist=%.1f Angle=%.1f Height=%.1f AnchorBonus=%.2f"),
+            UE_LOG(LogSOTSKEM, Verbose,
+                TEXT("[KEM Anchor] %s matched anchor '%s' (Family=%s) bonus %.2f"),
                 *Candidate.ExecutionName,
-                Status,
-                Candidate.Score,
-                *RejectName,
-                *Candidate.FailureReason,
-                Candidate.DistanceToTarget,
-                Candidate.FacingAngleDeg,
-                Candidate.HeightDelta,
+                *GetNameSafe(CandidateAnchor),
+                *FamilyName,
                 AnchorBonus);
-            UE_LOG(LogSOTSKEM, Verbose, TEXT("%s"), *CandidateMessage);
-            if (AnchorBonus > 0.f && CandidateAnchor)
-            {
-                const FString FamilyName = ExecutionFamilyEnum
-                    ? ExecutionFamilyEnum->GetNameStringByValue(static_cast<int64>(CandidateAnchor->GetExecutionFamily()))
-                    : TEXT("Unknown");
-                UE_LOG(LogSOTSKEM, Verbose,
-                    TEXT("[KEM Anchor] %s matched anchor '%s' (Family=%s) bonus %.2f"),
-                    *Candidate.ExecutionName,
-                    *GetNameSafe(CandidateAnchor),
-                    *FamilyName,
-                    AnchorBonus);
-            }
         }
 
         const int32 CandidateIndex = CandidateRecords.Num() - 1;
@@ -1687,9 +1720,66 @@ bool USOTS_KEMManagerSubsystem::RequestExecutionInternal(
     LastCandidateDebug = CandidateRecords;
     LastDecisionSnapshot.CandidateRecords = CandidateRecords;
 
+    if (IsDebugAtLeast(EKEMDebugVerbosity::Verbose))
+    {
+        const FString SourceLabelLogged = LastDecisionSnapshot.SourceLabel.IsEmpty()
+            ? TEXT("Unknown")
+            : LastDecisionSnapshot.SourceLabel;
+        const FString InstigatorName = GetNameSafe(Instigator);
+        const FString TargetName = GetNameSafe(Target);
+        const FString WinnerName = BestDef
+            ? (BestDef->ExecutionTag.IsValid() ? BestDef->ExecutionTag.ToString() : BestDef->GetName())
+            : TEXT("None");
+        const float WinnerScore = bHasCandidate ? BestScore : 0.f;
+
+        for (const FSOTS_KEMCandidateDebugRecord& CandidateRecord : CandidateRecords)
+        {
+            const FString RejectName = RejectReasonEnum
+                ? RejectReasonEnum->GetNameStringByValue(static_cast<int64>(CandidateRecord.RejectReason))
+                : TEXT("Unknown");
+            const FString FailureReason = CandidateRecord.FailureReason.IsEmpty()
+                ? TEXT("None")
+                : CandidateRecord.FailureReason;
+
+            UE_LOG(LogSOTSKEM, Verbose,
+                TEXT("KEM: Candidate '%s' Score=%.2f Selected=%s Reject=%s Reason=%s Dist=%.1f Angle=%.1f Height=%.1f"),
+                *CandidateRecord.ExecutionName,
+                CandidateRecord.Score,
+                CandidateRecord.bSelected ? TEXT("true") : TEXT("false"),
+                *RejectName,
+                *FailureReason,
+                CandidateRecord.DistanceToTarget,
+                CandidateRecord.FacingAngleDeg,
+                CandidateRecord.HeightDelta);
+        }
+
+        UE_LOG(LogSOTSKEM, Verbose,
+            TEXT("KEM: Request Source=%s Instigator=%s Target=%s Candidates=%d Winner=%s Score=%.2f"),
+            *SourceLabelLogged,
+            *InstigatorName,
+            *TargetName,
+            CandidateRecords.Num(),
+            *WinnerName,
+            WinnerScore);
+    }
+
     if (!bHasCandidate || !BestDef)
     {
-        UE_LOG(LogSOTSKEM, Verbose, TEXT("RequestExecution: No valid execution found for this context."));
+        if (IsDebugAtLeast(EKEMDebugVerbosity::Verbose))
+        {
+            UE_LOG(LogSOTSKEM, Verbose,
+                TEXT("KEM: No valid execution for Instigator=%s Target=%s Candidates=%d"),
+                *GetNameSafe(Instigator),
+                *GetNameSafe(Target),
+                CandidateRecords.Num());
+        }
+
+        if (bWithinFallbackDistance && Instigator && TryPlayFallbackMontage(Instigator))
+        {
+            UE_LOG(LogSOTSKEM, Log,
+                TEXT("KEM: Fallback montage triggered for Instigator=%s"),
+                *Instigator->GetName());
+        }
 
         if (IsDebugAtLeast(EKEMDebugVerbosity::Verbose) && CandidateRecords.Num() > 0)
         {

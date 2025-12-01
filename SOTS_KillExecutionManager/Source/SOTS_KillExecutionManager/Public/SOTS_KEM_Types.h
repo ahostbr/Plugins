@@ -74,6 +74,7 @@ enum class ESOTS_KEMRejectReason : uint8
 {
     None            UMETA(DisplayName="None"),
     MissingDefinition UMETA(DisplayName="Missing Definition"),
+    AbilityRequirementFailed UMETA(DisplayName="Ability Requirement Failed"),
     StealthBlocked  UMETA(DisplayName="Stealth Blocked"),
     MissionTagMismatch UMETA(DisplayName="Mission Tag Mismatch"),
     DistanceOutOfRange UMETA(DisplayName="Distance Out Of Range"),

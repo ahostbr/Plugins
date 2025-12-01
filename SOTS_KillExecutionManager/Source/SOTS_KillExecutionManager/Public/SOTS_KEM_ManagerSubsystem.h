@@ -14,6 +14,7 @@ class USOTS_AbilityRequirementLibraryAsset;
 struct FSOTS_AbilityRequirementCheckResult;
 class UContextualAnimSceneAsset;
 class ASOTS_KEMExecutionAnchor;
+class UAnimMontage;
 
 USTRUCT(BlueprintType)
 struct FSOTS_KEMAnchorDebugInfo
@@ -206,6 +207,12 @@ public:
     UPROPERTY(EditAnywhere, Config, Category="KEM|Debug", meta=(ClampMin="0.0"))
     float AnchorSearchRadius = 600.f;
 
+    UPROPERTY(EditAnywhere, Config, Category="KEM|Fallback")
+    TObjectPtr<UAnimMontage> FallbackMontage = nullptr;
+
+    UPROPERTY(EditAnywhere, Config, Category="KEM|Fallback", meta=(ClampMin="0.0"))
+    float FallbackTriggerDistance = 250.f;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="KEM|Debug")
     bool bAnchorDebugDraw = false;
 
@@ -380,6 +387,8 @@ public:
     void OnCooldownExpired();
 
     FTimerHandle CooldownTimerHandle;
+
+    bool TryPlayFallbackMontage(AActor* Instigator) const;
 
     void BroadcastExecutionEvent(ESOTS_KEM_ExecutionResult Result,
                                  const FSOTS_ExecutionContext& Context,
