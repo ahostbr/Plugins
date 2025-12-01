@@ -1,0 +1,16 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "SOTS Debug",
+  "Description": "Debug and visualization tools for Shadows And Shurikens (SuiteDebug subsystem, KEM anchor overlay, etc.).",
+  "Category": "SOTS",
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "SOTS_Debug",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}
