@@ -49,6 +49,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="SOTS|Steam|Debug|Achievements", meta=(WorldContext="WorldContextObject"))
     static void DebugDumpAchievementsToLog(const UObject* WorldContextObject);
 
+    UFUNCTION(BlueprintCallable, Category="SOTS|Steam|Debug|Achievements", meta=(WorldContext="WorldContextObject"))
+    static bool DebugGetAchievementSyncStatus(const UObject* WorldContextObject, FString& OutStatusMessage);
+
     // -------------------------
     // Leaderboards debug helpers
     // -------------------------

@@ -361,6 +361,26 @@ bool USOTS_SteamAchievementsSubsystem::TryPushAchievementToOnline(
     return true;
 }
 
+bool USOTS_SteamAchievementsSubsystem::IsOnlineAchievementSyncAvailable() const
+{
+    if (!ShouldUseOnlineAchievements())
+    {
+        return false;
+    }
+
+    if (!GetOnlineAchievementsInterface().IsValid())
+    {
+        return false;
+    }
+
+    if (!GetPrimaryUserId().IsValid())
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool USOTS_SteamAchievementsSubsystem::IsAchievementUnlocked(FName InternalId) const
 {
     if (!bStatsLoaded)

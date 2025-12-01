@@ -61,6 +61,9 @@ public:
         int32 Max,
         bool bAutoUnlockOnComplete);
 
+    UFUNCTION(BlueprintPure, Category="SOTS|Steam|Achievements")
+    bool IsOnlineAchievementSyncAvailable() const;
+
     // Debug helper: dump current local achievement state to the log.
     UFUNCTION(BlueprintCallable, Category="SOTS|Steam|Achievements|Debug")
     void DumpAchievementsToLog() const;

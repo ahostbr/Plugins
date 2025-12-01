@@ -78,6 +78,24 @@ void USOTS_SteamDebugLibrary::DebugDumpAchievementsToLog(const UObject* WorldCon
     UE_LOG(LogSOTS_Steam, Warning, TEXT("DebugDumpAchievementsToLog - Achievements subsystem not available."));
 }
 
+bool USOTS_SteamDebugLibrary::DebugGetAchievementSyncStatus(const UObject* WorldContextObject, FString& OutStatusMessage)
+{
+    if (USOTS_SteamAchievementsSubsystem* Subsys = GetAchievementsSubsystem(WorldContextObject))
+    {
+        const bool bReady = Subsys->IsOnlineAchievementSyncAvailable();
+        OutStatusMessage = bReady
+            ? TEXT("Steam achievement sync is ready.")
+            : TEXT("Steam achievement sync is not available (check settings or Steam connection).");
+
+        UE_LOG(LogSOTS_Steam, Log, TEXT("DebugGetAchievementSyncStatus - %s"), *OutStatusMessage);
+        return bReady;
+    }
+
+    OutStatusMessage = TEXT("Achievements subsystem not available.");
+    UE_LOG(LogSOTS_Steam, Warning, TEXT("DebugGetAchievementSyncStatus - Achievements subsystem not available."));
+    return false;
+}
+
 void USOTS_SteamDebugLibrary::DebugSubmitScore(
     const UObject* WorldContextObject,
     FName LeaderboardInternalId,
