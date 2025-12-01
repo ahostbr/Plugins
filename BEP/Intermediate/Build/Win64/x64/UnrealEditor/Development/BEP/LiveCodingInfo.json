@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.BEP.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"BEP.cpp.obj",
+			"BlueprintFlowExporter.cpp.obj"
+		]
+	}
+}

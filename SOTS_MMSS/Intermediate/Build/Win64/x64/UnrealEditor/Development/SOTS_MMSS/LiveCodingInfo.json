@@ -1,0 +1,16 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_MMSS.cpp.obj": [
+			"SOTS_MMSS.init.gen.cpp.obj",
+			"SOTS_MMSSBPLibrary.gen.cpp.obj",
+			"SOTS_MMSSSubsystem.gen.cpp.obj",
+			"SOTS_MMSS_MissionMusicLibrary.gen.cpp.obj",
+			"SOTS_MMSS_Types.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SOTS_MMSSBPLibrary.cpp.obj",
+			"SOTS_MMSSModule.cpp.obj",
+			"SOTS_MMSSSubsystem.cpp.obj"
+		]
+	}
+}

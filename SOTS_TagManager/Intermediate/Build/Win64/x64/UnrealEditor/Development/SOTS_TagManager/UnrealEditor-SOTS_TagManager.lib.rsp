@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-SOTS_TagManager.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"E:/SAS/ShadowsAndShurikens/Intermediate/Build/Win64/x64/ShadowsAndShurikensEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_TagManager/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_TagManager/Module.SOTS_TagManager.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_TagManager/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_TagManager/Default.rc2.res"
+/OUT:"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_TagManager/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_TagManager/UnrealEditor-SOTS_TagManager.lib"

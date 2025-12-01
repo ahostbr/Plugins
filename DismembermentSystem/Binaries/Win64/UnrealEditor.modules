@@ -1,0 +1,8 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"DismembermentSystem": "UnrealEditor-DismembermentSystem.dll",
+		"DismembermentSystemEditor": "UnrealEditor-DismembermentSystemEditor.dll"
+	}
+}

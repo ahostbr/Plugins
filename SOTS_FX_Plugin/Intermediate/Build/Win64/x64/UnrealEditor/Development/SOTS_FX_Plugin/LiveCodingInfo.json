@@ -1,0 +1,22 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_FX_Plugin.cpp.obj": [
+			"SOTSFXTypes.gen.cpp.obj",
+			"SOTS_FXBlueprintLibrary.gen.cpp.obj",
+			"SOTS_FXCueDefinition.gen.cpp.obj",
+			"SOTS_FXDefinitionLibrary.gen.cpp.obj",
+			"SOTS_FXManagerSubsystem.gen.cpp.obj",
+			"SOTS_FX_Plugin.init.gen.cpp.obj",
+			"SOTS_StealthFXController.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SOTS_FXBlueprintLibrary.cpp.obj",
+			"SOTS_FXCueDefinition.cpp.obj",
+			"SOTS_FXDefinitionLibrary.cpp.obj",
+			"SOTS_FXManagerSubsystem.cpp.obj",
+			"SOTS_FX_Plugin.cpp.obj",
+			"SOTS_FX_PluginModule.cpp.obj",
+			"SOTS_StealthFXController.cpp.obj"
+		]
+	}
+}

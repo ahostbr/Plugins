@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-SOTS_INV.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"E:/SAS/ShadowsAndShurikens/Intermediate/Build/Win64/x64/ShadowsAndShurikensEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_INV/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_INV/Module.SOTS_INV.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_INV/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_INV/Default.rc2.res"
+/OUT:"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_INV/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_INV/UnrealEditor-SOTS_INV.lib"

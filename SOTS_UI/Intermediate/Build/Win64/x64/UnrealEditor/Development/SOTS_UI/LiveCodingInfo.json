@@ -1,0 +1,18 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_UI.cpp.obj": [
+			"SOTS_HUDSubsystem.gen.cpp.obj",
+			"SOTS_NotificationSubsystem.gen.cpp.obj",
+			"SOTS_UI.init.gen.cpp.obj",
+			"SOTS_UIAbilityLibrary.gen.cpp.obj",
+			"SOTS_WaypointSubsystem.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SOTS_HUDSubsystem.cpp.obj",
+			"SOTS_NotificationSubsystem.cpp.obj",
+			"SOTS_UIAbilityLibrary.cpp.obj",
+			"SOTS_UIModule.cpp.obj",
+			"SOTS_WaypointSubsystem.cpp.obj"
+		]
+	}
+}

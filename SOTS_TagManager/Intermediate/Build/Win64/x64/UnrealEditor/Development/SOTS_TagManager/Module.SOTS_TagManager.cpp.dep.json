@@ -1,0 +1,33 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\sots_tagmanager\\module.sots_tagmanager.cpp",
+        "ProvidedModule": "",
+        "PCH": "e:\\sas\\shadowsandshurikens\\intermediate\\build\\win64\\x64\\shadowsandshurikenseditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\sots_tagmanager\\definitions.sots_tagmanager.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_tagmanager\\uht\\sots_gameplaytagmanagersubsystem.gen.cpp",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\public\\sots_gameplaytagmanagersubsystem.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagcontainer.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\core\\public\\misc\\comparisonutility.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagcontainer.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_tagmanager\\uht\\sots_gameplaytagmanagersubsystem.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_tagmanager\\uht\\sots_taglibrary.gen.cpp",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\public\\sots_taglibrary.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_tagmanager\\uht\\sots_taglibrary.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_tagmanager\\uht\\sots_tagmanager.init.gen.cpp",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\sots_tagmanager\\permoduleinline.gen.cpp",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\private\\sots_gameplaytagmanagersubsystem.cpp",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagassetinterface.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagassetinterface.generated.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagsmanager.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagsmanager.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\private\\sots_taglibrary.cpp",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\public\\sots_tagaccesshelpers.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_tagmanager\\source\\sots_tagmanager\\private\\sots_tagmanagermodule.cpp"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

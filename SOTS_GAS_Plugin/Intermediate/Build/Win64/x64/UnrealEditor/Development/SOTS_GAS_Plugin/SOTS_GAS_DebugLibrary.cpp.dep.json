@@ -1,0 +1,36 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\private\\sots_gas_debuglibrary.cpp",
+        "ProvidedModule": "",
+        "PCH": "e:\\sas\\shadowsandshurikens\\intermediate\\build\\win64\\x64\\shadowsandshurikenseditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\sots_gas_plugin\\definitions.sots_gas_plugin.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\sots_gas_debuglibrary.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagcontainer.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\core\\public\\misc\\comparisonutility.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagcontainer.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_gas_debuglibrary.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\sots_gas_abilityrequirementlibrary.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\data\\sots_abilitytypes.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_abilitytypes.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_gas_abilityrequirementlibrary.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\sots_gas_abilityrequirementlibraryasset.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_gas_abilityrequirementlibraryasset.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\sots_gas_skilltreelibrary.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_gas_skilltreelibrary.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\source\\sots_gas_plugin\\public\\subsystems\\sots_gas_stealthbridgesubsystem.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\source\\sots_globalstealthmanager\\public\\sots_globalstealthmanagersubsystem.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\source\\sots_globalstealthmanager\\public\\sots_globalstealthtypes.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_globalstealthmanager\\uht\\sots_globalstealthtypes.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\source\\sots_globalstealthmanager\\public\\sots_stealthconfigdataasset.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_globalstealthmanager\\uht\\sots_stealthconfigdataasset.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_globalstealthmanager\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_globalstealthmanager\\uht\\sots_globalstealthmanagersubsystem.generated.h",
+            "e:\\sas\\shadowsandshurikens\\plugins\\sots_gas_plugin\\intermediate\\build\\win64\\unrealeditor\\inc\\sots_gas_plugin\\uht\\sots_gas_stealthbridgesubsystem.generated.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagassetinterface.h",
+            "e:\\ue_5.7p\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagassetinterface.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

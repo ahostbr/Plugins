@@ -1,0 +1,22 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DismembermentSystem.cpp.obj": [
+			"BloodPool.gen.cpp.obj",
+			"DismemberedAnimInstance.gen.cpp.obj",
+			"DismembermentComponent.gen.cpp.obj",
+			"DismembermentSystem.init.gen.cpp.obj",
+			"GoreComponent.gen.cpp.obj",
+			"LimbMap.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"DismemberedAnimInstance.cpp.obj",
+			"DismembermentSystem.cpp.obj",
+			"DismembermentSystem_Log.cpp.obj",
+			"BloodPool.cpp.obj",
+			"GoreComponent.cpp.obj",
+			"LimbMap.cpp.obj",
+			"DismembermentVersioning.cpp.obj",
+			"DismembermentComponent.cpp.obj"
+		]
+	}
+}

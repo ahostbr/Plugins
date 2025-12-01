@@ -1,0 +1,15 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_MissionDirector.cpp.obj": [
+			"SOTS_MissionDirector.init.gen.cpp.obj",
+			"SOTS_MissionDirectorDebugLibrary.gen.cpp.obj",
+			"SOTS_MissionDirectorSubsystem.gen.cpp.obj",
+			"SOTS_MissionDirectorTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SOTS_MissionDirectorDebugLibrary.cpp.obj",
+			"SOTS_MissionDirectorModule.cpp.obj",
+			"SOTS_MissionDirectorSubsystem.cpp.obj"
+		]
+	}
+}

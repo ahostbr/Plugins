@@ -1,0 +1,19 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.BlueprintCommentLinksEditor.cpp.obj": [
+			"BlueprintCommentLinksCacheFile.gen.cpp.obj",
+			"BlueprintCommentLinksEditor.init.gen.cpp.obj",
+			"BlueprintCommentLinksTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"BlueprintCommentLinkCommentDetails.cpp.obj",
+			"BlueprintCommentLinksCacheFile.cpp.obj",
+			"BlueprintCommentLinksEditorModule.cpp.obj",
+			"BlueprintCommentLinksGraphPanelNodeFactory.cpp.obj",
+			"BlueprintCommentLinksState.cpp.obj",
+			"BlueprintCommentLinksTypes.cpp.obj",
+			"SBlueprintCommentLinksGraphNode.cpp.obj",
+			"SCommentLinkOverlay.cpp.obj"
+		]
+	}
+}

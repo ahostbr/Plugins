@@ -1,0 +1,15 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-SOTS_GAS_Plugin.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"E:/SAS/ShadowsAndShurikens/Intermediate/Build/Win64/x64/ShadowsAndShurikensEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/Module.SOTS_GAS_Plugin.1.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/Module.SOTS_GAS_Plugin.2.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/Module.SOTS_GAS_Plugin.3.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/SOTS_GAS_DebugLibrary.cpp.obj"
+"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/Default.rc2.res"
+/OUT:"E:/SAS/ShadowsAndShurikens/Plugins/SOTS_GAS_Plugin/Intermediate/Build/Win64/x64/UnrealEditor/Development/SOTS_GAS_Plugin/UnrealEditor-SOTS_GAS_Plugin.lib"

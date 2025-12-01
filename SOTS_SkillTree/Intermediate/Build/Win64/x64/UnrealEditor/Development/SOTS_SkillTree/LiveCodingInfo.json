@@ -1,0 +1,19 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_SkillTree.cpp.obj": [
+			"SOTS_SkillTree.init.gen.cpp.obj",
+			"SOTS_SkillTreeComponent.gen.cpp.obj",
+			"SOTS_SkillTreeDefinition.gen.cpp.obj",
+			"SOTS_SkillTreeLibrary.gen.cpp.obj",
+			"SOTS_SkillTreeSubsystem.gen.cpp.obj",
+			"SOTS_SkillTreeTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"SOTS_SkillTreeComponent.cpp.obj",
+			"SOTS_SkillTreeDefinition.cpp.obj",
+			"SOTS_SkillTreeLibrary.cpp.obj",
+			"SOTS_SkillTreeModule.cpp.obj",
+			"SOTS_SkillTreeSubsystem.cpp.obj"
+		]
+	}
+}

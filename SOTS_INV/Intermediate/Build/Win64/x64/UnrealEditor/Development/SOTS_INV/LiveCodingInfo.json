@@ -1,0 +1,14 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.SOTS_INV.cpp.obj": [
+			"InvSPInventoryComponent.gen.cpp.obj",
+			"SOTS_INV.init.gen.cpp.obj",
+			"SOTS_InventoryBridgeSubsystem.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"InvSPInventoryComponent.cpp.obj",
+			"SOTS_InventoryBridgeSubsystem.cpp.obj",
+			"SOTS_INVModule.cpp.obj"
+		]
+	}
+}
