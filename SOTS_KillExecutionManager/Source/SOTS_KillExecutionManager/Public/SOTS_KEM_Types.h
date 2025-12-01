@@ -520,6 +520,20 @@ struct FSOTS_KEM_AISConfig
 };
 
 
+UENUM()
+enum class ESOTS_KEM_PositionKind : uint8
+{
+    Unknown,
+    GroundRear,
+    GroundFront,
+    GroundLeft,
+    GroundRight,
+    VerticalAbove,
+    VerticalBelow,
+    CornerLeft,
+    CornerRight
+};
+
 // Main execution definition DA
 UCLASS(BlueprintType)
 class SOTS_KILLEXECUTIONMANAGER_API USOTS_KEM_ExecutionDefinition : public UPrimaryDataAsset
@@ -546,6 +560,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Selection")
     FGameplayTag ExecutionFamilyTag;
 
+    // PositionTag indicates the canonical relative position of the instigator
+    // to the target for this execution (Ground.Rear, Ground.Left, Vertical.Above,
+    // etc.). OmniTrace patterns, CAS offsets, and DevTools reports rely on the
+    // SOTS.KEM.Position.* taxonomy staying stable.
+    // DevTools: KEM execution reports treat PositionTag as the primary key for
+    // grouping and validating kill positions.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Selection")
     FGameplayTag PositionTag;
 
@@ -625,6 +645,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Validation")
     FSOTS_KEMValidationResult ValidateDefinition() const;
+
+    ESOTS_KEM_PositionKind GetPositionKind() const;
 };
 
 // Internal CAS evaluation result (C++ only)

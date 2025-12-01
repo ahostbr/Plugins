@@ -77,3 +77,48 @@ FSOTS_KEMValidationResult USOTS_KEM_ExecutionDefinition::ValidateDefinition() co
 
     return Result;
 }
+
+ESOTS_KEM_PositionKind USOTS_KEM_ExecutionDefinition::GetPositionKind() const
+{
+    if (!PositionTag.IsValid())
+    {
+        return ESOTS_KEM_PositionKind::Unknown;
+    }
+
+    const FName TagName = PositionTag.GetTagName();
+
+    if (TagName == TEXT("SOTS.KEM.Position.Ground.Rear"))
+    {
+        return ESOTS_KEM_PositionKind::GroundRear;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Ground.Front"))
+    {
+        return ESOTS_KEM_PositionKind::GroundFront;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Ground.Left"))
+    {
+        return ESOTS_KEM_PositionKind::GroundLeft;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Ground.Right"))
+    {
+        return ESOTS_KEM_PositionKind::GroundRight;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Vertical.Above"))
+    {
+        return ESOTS_KEM_PositionKind::VerticalAbove;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Vertical.Below"))
+    {
+        return ESOTS_KEM_PositionKind::VerticalBelow;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Corner.Left"))
+    {
+        return ESOTS_KEM_PositionKind::CornerLeft;
+    }
+    if (TagName == TEXT("SOTS.KEM.Position.Corner.Right"))
+    {
+        return ESOTS_KEM_PositionKind::CornerRight;
+    }
+
+    return ESOTS_KEM_PositionKind::Unknown;
+}

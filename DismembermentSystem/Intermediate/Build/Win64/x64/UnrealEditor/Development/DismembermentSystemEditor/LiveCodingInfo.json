@@ -1,9 +1,0 @@
-{
-	"RemapUnityFiles": 
-	{
-		"Module.DismembermentSystemEditor.cpp.obj": [
-			"PerModuleInline.gen.cpp.obj",
-			"DismembermentSystemEditor.cpp.obj"
-		]
-	}
-}
