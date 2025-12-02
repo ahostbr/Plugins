@@ -138,7 +138,7 @@ void FBlueprintCommentLinkCommentDetails::BuildCommentLinksCategory(
                 FBlueprintCommentLinkCommentStyle& LocalStyle = LocalData.GetOrCreateStyle(CommentGuid);
 
                 FColorPickerArgs Args;
-                Args.InitialColorOverride = LocalStyle.HandleColor;
+                Args.InitialColor = LocalStyle.HandleColor;
                 Args.bUseAlpha = true;
                 Args.OnColorCommitted = FOnLinearColorValueChanged::CreateLambda(
                     [Graph, CommentGuid](FLinearColor NewColor)
@@ -178,7 +178,7 @@ void FBlueprintCommentLinkCommentDetails::BuildCommentLinksCategory(
                 FBlueprintCommentLinkCommentStyle& LocalStyle = LocalData.GetOrCreateStyle(CommentGuid);
 
                 FColorPickerArgs Args;
-                Args.InitialColorOverride = LocalStyle.WireColor;
+                Args.InitialColor = LocalStyle.WireColor;
                 Args.bUseAlpha = true;
                 Args.OnColorCommitted = FOnLinearColorValueChanged::CreateLambda(
                     [Graph, CommentGuid](FLinearColor NewColor)

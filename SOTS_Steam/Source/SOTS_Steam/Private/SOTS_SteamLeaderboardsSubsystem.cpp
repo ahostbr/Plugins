@@ -4,6 +4,7 @@
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Interfaces/OnlineLeaderboardInterface.h"
+#include "OnlineStats.h"
 #include "SOTS_SteamSettings.h"
 #include "SOTS_SteamLeaderboardSaveGame.h"
 #include "SOTS_SteamLog.h"
@@ -680,7 +681,7 @@ void USOTS_SteamLeaderboardsSubsystem::BuildRowsFromCurrentRead(TArray<FSOTS_Ste
     const FName InternalId = CurrentReadInternalId;
     const FName RatedStatName = CurrentReadRatedStatName;
 
-    for (const FOnlineLeaderboardRow& Row : CurrentReadObject->Rows)
+    for (const FOnlineStatsRow& Row : CurrentReadObject->Rows)
     {
         FSOTS_SteamLeaderboardRow Entry;
         Entry.InternalId = InternalId;
@@ -690,7 +691,8 @@ void USOTS_SteamLeaderboardsSubsystem::BuildRowsFromCurrentRead(TArray<FSOTS_Ste
         int32 Score = 0;
         if (RatedStatName != NAME_None)
         {
-            const FVariantData* ScoreData = Row.Columns.Find(RatedStatName);
+            const FString ColumnName = RatedStatName.ToString();
+            const FVariantData* ScoreData = Row.Columns.Find(ColumnName);
             if (ScoreData)
             {
                 ScoreData->GetValue(Score);
