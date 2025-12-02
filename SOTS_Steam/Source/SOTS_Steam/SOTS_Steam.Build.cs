@@ -11,7 +11,8 @@ public class SOTS_Steam : ModuleRules
             {
                 "Core",
                 "CoreUObject",
-                "Engine"
+                "Engine",
+                "OnlineSubsystem"
             }
         );
 
@@ -20,7 +21,6 @@ public class SOTS_Steam : ModuleRules
             {
                 "DeveloperSettings",
                 "GameplayTags",
-                "OnlineSubsystem",
                 "OnlineSubsystemUtils"
             }
         );

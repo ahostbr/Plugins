@@ -59,7 +59,7 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
         return;
     }
 
-    AActor* Instigator = Context.Instigator.Get();
+    AActor* InstigatorActor = Context.Instigator.Get();
     AActor* Target = Context.Target.Get();
 
     UWorld* World = GetWorld();
@@ -75,7 +75,7 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
     }
 
     bool bAppliedWarpResult = false;
-    if (Instigator && WarpResult.WarpTargets.Num() > 0)
+    if (InstigatorActor && WarpResult.WarpTargets.Num() > 0)
     {
         const FName PreferredWarpPoint = SpawnData->InstigatorWarpPointNames.Num() > 0
             ? SpawnData->InstigatorWarpPointNames[0]
@@ -97,12 +97,12 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
 
         auto RegisterWarpTarget = [&](const FSOTS_KEM_WarpRuntimeTarget& RuntimeTarget) -> bool
         {
-            if (!Instigator)
+            if (!InstigatorActor)
             {
                 return false;
             }
 
-            if (UMotionWarpingComponent* MotionWarp = Instigator->FindComponentByClass<UMotionWarpingComponent>())
+            if (UMotionWarpingComponent* MotionWarp = InstigatorActor->FindComponentByClass<UMotionWarpingComponent>())
             {
                 MotionWarp->AddOrUpdateWarpTargetFromTransform(RuntimeTarget.TargetName, RuntimeTarget.TargetTransform);
                 return true;
@@ -175,7 +175,7 @@ void ASOTS_ExecutionHelperActor::PrePlaySpawnMontages_Implementation()
             return false;
         };
 
-        if (TryResolveWarpPoints(SpawnData->InstigatorWarpPointNames, Instigator, false))
+        if (TryResolveWarpPoints(SpawnData->InstigatorWarpPointNames, InstigatorActor, false))
         {
             return;
         }

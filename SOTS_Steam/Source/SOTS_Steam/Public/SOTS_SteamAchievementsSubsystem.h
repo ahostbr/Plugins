@@ -5,6 +5,7 @@
 #include "SOTS_SteamTypes.h"
 #include "SOTS_SteamAchievementRegistry.h"
 #include "SOTS_SteamAchievementSaveGame.h"
+#include "OnlineSubsystem.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Interfaces/OnlineAchievementsInterface.h"
 #include "SOTS_SteamAchievementsSubsystem.generated.h"

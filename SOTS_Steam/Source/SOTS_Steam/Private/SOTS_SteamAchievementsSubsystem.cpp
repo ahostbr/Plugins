@@ -4,7 +4,7 @@
 #include "SOTS_SteamAchievementSaveGame.h"
 #include "SOTS_SteamLog.h"
 #include "OnlineSubsystem.h"
-#include "OnlineAchievementsTypes.h"
+#include "OnlineStats.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
@@ -350,14 +350,10 @@ bool USOTS_SteamAchievementsSubsystem::TryPushAchievementToOnline(
         Progress = FMath::Clamp<float>(static_cast<float>(State->Current) / static_cast<float>(State->Max), 0.0f, 1.0f);
     }
 
-    WriteObject->SetFloatStat(ApiName, Progress);
+    WriteObject->SetFloatStat(ApiName.ToString(), Progress);
 
-    if (!Achievements->WriteAchievements(*UserId, WriteObject.ToSharedRef()))
-    {
-        return false;
-    }
-
-    Achievements->FlushAchievements(*UserId);
+    FOnlineAchievementsWriteRef WriteRef = WriteObject.ToSharedRef();
+    Achievements->WriteAchievements(*UserId, WriteRef);
     return true;
 }
 

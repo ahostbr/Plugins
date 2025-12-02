@@ -11,11 +11,11 @@
 #include "InvSPInventoryComponent.h"
 #include "SOTS_StatsComponent.h"
 #include "Components/ActorComponent.h"
+#include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.h"
 #include "SOTS_SuiteDebugSubsystem.generated.h"
 
 class UWorld;
 class AActor;
-class USOTS_KEMAnchorDebugWidget;
 
 /**
  * A read-only game instance subsystem that aggregates state across SOTS subsystems
@@ -86,7 +86,7 @@ protected:
     AActor* GetPlayerPawn() const;
 
     UPROPERTY(EditAnywhere, Category = "SOTS|KEM|Debug", meta = (DisplayName = "KEM Anchor Overlay"))
-    TSubclassOf<USOTS_KEMAnchorDebugWidget> KEMAnchorDebugWidgetClass;
+    TSubclassOf<USOTS_KillExecutionManagerKEMAnchorDebugWidget> KEMAnchorDebugWidgetClass;
 
     UFUNCTION()
     void ShowKEMAnchorOverlay();
@@ -95,5 +95,5 @@ protected:
     void HideKEMAnchorOverlay();
 
 private:
-    TWeakObjectPtr<USOTS_KEMAnchorDebugWidget> KEMAnchorDebugWidgetInstance;
+    TWeakObjectPtr<USOTS_KillExecutionManagerKEMAnchorDebugWidget> KEMAnchorDebugWidgetInstance;
 };

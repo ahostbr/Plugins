@@ -5,7 +5,7 @@
 #include "SOTS_SteamTypes.h"
 #include "SOTS_SteamLeaderboardRegistry.h"
 #include "Interfaces/OnlineIdentityInterface.h"
-#include "Interfaces/OnlineLeaderboardsInterface.h"
+#include "Interfaces/OnlineLeaderboardInterface.h"
 #include "UObject/SoftObjectPtr.h"
 #include "SOTS_SteamLeaderboardsSubsystem.generated.h"
 
@@ -98,6 +98,9 @@ public:
         const FSOTS_SteamMissionResult& Result,
         const FString& PlayerName,
         bool bOnlyIfBetter);
+
+    UFUNCTION(BlueprintCallable, Category="SOTS|Steam|Leaderboards|Debug")
+    void DumpLeaderboardsToLog() const;
 
 public:
     UPROPERTY(BlueprintAssignable, Category="SOTS|Steam|Leaderboards")

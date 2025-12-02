@@ -15,9 +15,7 @@
 #include "Components/SOTS_AbilityComponent.h"
 #include "SOTS_GameplayTagManagerSubsystem.h"
 #include "SOTS_FXManagerSubsystem.h"
-#include "SOTS_ProfileSubsystem.h"
-#include "SOTS_ProfileTypes.h"
-#include "SOTS_KEMAnchorDebugWidget.h"
+#include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.h"
 #include "UObject/UnrealType.h"
 
 USOTS_SuiteDebugSubsystem* USOTS_SuiteDebugSubsystem::Get(const UObject* WorldContextObject)
@@ -133,24 +131,11 @@ FString USOTS_SuiteDebugSubsystem::GetInventorySummary() const
 FString USOTS_SuiteDebugSubsystem::GetStatsSummary(int32 TopN) const
 {
     const TMap<FGameplayTag, float>* StatsMap = nullptr;
-    FSOTS_CharacterStateData Snapshot;
     if (AActor* Pawn = GetPlayerPawn())
     {
-        if (UGameInstance* GameInstance = GetGameInstance())
+        if (USOTS_StatsComponent* Stats = Pawn->FindComponentByClass<USOTS_StatsComponent>())
         {
-            if (USOTS_ProfileSubsystem* ProfileSubsystem = GameInstance->GetSubsystem<USOTS_ProfileSubsystem>())
-            {
-                ProfileSubsystem->BuildCharacterStatsStateFromWorld(Pawn, Snapshot);
-                StatsMap = &Snapshot.StatValues;
-            }
-        }
-
-        if (!StatsMap)
-        {
-            if (USOTS_StatsComponent* Stats = Pawn->FindComponentByClass<USOTS_StatsComponent>())
-            {
-                StatsMap = &Stats->GetAllStats();
-            }
+            StatsMap = &Stats->GetAllStats();
         }
     }
 
@@ -281,7 +266,7 @@ void USOTS_SuiteDebugSubsystem::ShowKEMAnchorOverlay()
 
     if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
     {
-        if (USOTS_KEMAnchorDebugWidget* Widget = CreateWidget<USOTS_KEMAnchorDebugWidget>(PC, KEMAnchorDebugWidgetClass))
+        if (USOTS_KillExecutionManagerKEMAnchorDebugWidget* Widget = CreateWidget<USOTS_KillExecutionManagerKEMAnchorDebugWidget>(PC, KEMAnchorDebugWidgetClass))
         {
             Widget->AddToViewport();
             KEMAnchorDebugWidgetInstance = Widget;
@@ -291,7 +276,7 @@ void USOTS_SuiteDebugSubsystem::ShowKEMAnchorOverlay()
 
 void USOTS_SuiteDebugSubsystem::HideKEMAnchorOverlay()
 {
-    if (USOTS_KEMAnchorDebugWidget* Widget = KEMAnchorDebugWidgetInstance.Get())
+    if (USOTS_KillExecutionManagerKEMAnchorDebugWidget* Widget = KEMAnchorDebugWidgetInstance.Get())
     {
         Widget->RemoveFromParent();
         KEMAnchorDebugWidgetInstance.Reset();

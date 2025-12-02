@@ -3,16 +3,14 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/OnlineIdentityInterface.h"
-#include "Interfaces/OnlineLeaderboardsInterface.h"
-#include "OnlineLeaderboardTypes.h"
+#include "Interfaces/OnlineLeaderboardInterface.h"
 #include "SOTS_SteamSettings.h"
 #include "SOTS_SteamLeaderboardSaveGame.h"
 #include "SOTS_SteamLog.h"
-#include "SOTS_SteamModule.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
-#include "GameFramework/GameInstance.h"
+#include "Engine/GameInstance.h"
 #include "Math/UnrealMathUtility.h"
 #include "GameplayTagContainer.h"
 
@@ -205,6 +203,34 @@ bool USOTS_SteamLeaderboardsSubsystem::StoreLeaderboardData()
     LogVerbose(LogMsg);
 
     return true;
+}
+
+void USOTS_SteamLeaderboardsSubsystem::DumpLeaderboardsToLog() const
+{
+    const USOTS_SteamLeaderboardSaveGame* SaveGame = CurrentSaveGame;
+    if (!SaveGame)
+    {
+        UE_LOG(LogSOTS_Steam, Warning, TEXT("DumpLeaderboardsToLog - No saved leaderboard data available."));
+        return;
+    }
+
+    if (SaveGame->LeaderboardStates.IsEmpty())
+    {
+        UE_LOG(LogSOTS_Steam, Log, TEXT("DumpLeaderboardsToLog - No cached leaderboard entries."));
+        return;
+    }
+
+    for (const FSOTS_SteamLeaderboardBoardState& Entry : SaveGame->LeaderboardStates)
+    {
+        UE_LOG(
+            LogSOTS_Steam,
+            Log,
+            TEXT("Leaderboard '%s': BestScore=%d, LastScore=%d, PlayerName='%s'"),
+            *Entry.InternalId.ToString(),
+            Entry.BestScore,
+            Entry.LastScore,
+            *Entry.PlayerName);
+    }
 }
 
 FSOTS_SteamLeaderboardBoardState* USOTS_SteamLeaderboardsSubsystem::FindOrAddBoardState(FName InternalId)
@@ -556,14 +582,14 @@ bool USOTS_SteamLeaderboardsSubsystem::TryPushScoreToOnline(
 
     FOnlineLeaderboardWrite WriteObject;
     WriteObject.LeaderboardNames.Empty();
-    WriteObject.LeaderboardNames.Add(ApiName);
+    WriteObject.LeaderboardNames.Add(ApiName.ToString());
     WriteObject.DisplayFormat = ELeaderboardFormat::Number;
-    WriteObject.RatedStat = RatedStatName;
+    WriteObject.RatedStat = RatedStatName.ToString();
     WriteObject.SortMethod = ELeaderboardSort::Descending;
     WriteObject.UpdateMethod = bOnlyIfBetter
         ? ELeaderboardUpdateMethod::KeepBest
         : ELeaderboardUpdateMethod::Force;
-    WriteObject.SetIntStat(RatedStatName, Score);
+    WriteObject.SetIntStat(RatedStatName.ToString(), Score);
 
     static const FName SessionName = NAME_GameSession;
     const bool bStarted = Leaderboards->WriteLeaderboards(SessionName, *UserId, WriteObject);
@@ -758,11 +784,10 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamTopEntries(FName InternalId, in
     const FName RatedStatName = !Def->RatedStatName.IsNone() ? Def->RatedStatName : ApiName;
 
     CurrentReadObject = MakeShared<FOnlineLeaderboardRead, ESPMode::ThreadSafe>();
-    CurrentReadObject->LeaderboardName = ApiName;
+    CurrentReadObject->LeaderboardName = ApiName.ToString();
+    CurrentReadObject->SortedColumn = RatedStatName.ToString();
 
-    FColumnMetaData ColumnMeta;
-    ColumnMeta.ColumnName = RatedStatName;
-    ColumnMeta.DataType = EOnlineKeyValuePairDataType::Int32;
+    FColumnMetaData ColumnMeta(RatedStatName.ToString(), EOnlineKeyValuePairDataType::Int32);
     CurrentReadObject->ColumnMetadata.Add(ColumnMeta);
 
     CurrentReadInternalId = InternalId;
@@ -781,7 +806,8 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamTopEntries(FName InternalId, in
 
     LeaderboardReadCompleteDelegateHandle = Leaderboards->AddOnLeaderboardReadCompleteDelegate_Handle(Delegate);
 
-    const bool bStarted = Leaderboards->ReadLeaderboardsAroundRank(1, static_cast<uint32>(NumEntries), CurrentReadObject.ToSharedRef());
+    FOnlineLeaderboardReadRef ReadRef = CurrentReadObject.ToSharedRef();
+    const bool bStarted = Leaderboards->ReadLeaderboardsAroundRank(1, static_cast<uint32>(NumEntries), ReadRef);
     if (!bStarted)
     {
         if (LeaderboardReadCompleteDelegateHandle.IsValid())
@@ -851,11 +877,10 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamAroundPlayer(FName InternalId, 
     const FName RatedStatName = !Def->RatedStatName.IsNone() ? Def->RatedStatName : ApiName;
 
     CurrentReadObject = MakeShared<FOnlineLeaderboardRead, ESPMode::ThreadSafe>();
-    CurrentReadObject->LeaderboardName = ApiName;
+    CurrentReadObject->LeaderboardName = ApiName.ToString();
+    CurrentReadObject->SortedColumn = RatedStatName.ToString();
 
-    FColumnMetaData ColumnMeta;
-    ColumnMeta.ColumnName = RatedStatName;
-    ColumnMeta.DataType = EOnlineKeyValuePairDataType::Int32;
+    FColumnMetaData ColumnMeta(RatedStatName.ToString(), EOnlineKeyValuePairDataType::Int32);
     CurrentReadObject->ColumnMetadata.Add(ColumnMeta);
 
     CurrentReadInternalId = InternalId;
@@ -874,10 +899,13 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamAroundPlayer(FName InternalId, 
 
     LeaderboardReadCompleteDelegateHandle = Leaderboards->AddOnLeaderboardReadCompleteDelegate_Handle(Delegate);
 
+    FOnlineLeaderboardReadRef ReadRef = CurrentReadObject.ToSharedRef();
+    FUniqueNetIdRef UserIdRef = UserId.ToSharedRef();
+
     const bool bStarted = Leaderboards->ReadLeaderboardsAroundUser(
-        *UserId,
+        UserIdRef,
         static_cast<uint32>(Range),
-        CurrentReadObject.ToSharedRef());
+        ReadRef);
 
     if (!bStarted)
     {
