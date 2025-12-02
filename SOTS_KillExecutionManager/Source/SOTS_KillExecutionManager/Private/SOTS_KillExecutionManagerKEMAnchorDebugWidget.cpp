@@ -1,26 +1,26 @@
-#include "SOTS_KEMAnchorDebugWidget.h"
+#include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.h"
 
 #include "GameFramework/Actor.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 
-USOTS_KEMAnchorDebugWidget::USOTS_KEMAnchorDebugWidget(const FObjectInitializer& ObjectInitializer)
+USOTS_KillExecutionManagerKEMAnchorDebugWidget::USOTS_KillExecutionManagerKEMAnchorDebugWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
 }
 
-void USOTS_KEMAnchorDebugWidget::SetCenterActor(AActor* Actor)
+void USOTS_KillExecutionManagerKEMAnchorDebugWidget::SetCenterActor(AActor* Actor)
 {
     CenterActor = Actor;
 }
 
-void USOTS_KEMAnchorDebugWidget::SetSearchRadius(float Radius)
+void USOTS_KillExecutionManagerKEMAnchorDebugWidget::SetSearchRadius(float Radius)
 {
     SearchRadius = FMath::Max(0.f, Radius);
 }
 
-void USOTS_KEMAnchorDebugWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+void USOTS_KillExecutionManagerKEMAnchorDebugWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
 

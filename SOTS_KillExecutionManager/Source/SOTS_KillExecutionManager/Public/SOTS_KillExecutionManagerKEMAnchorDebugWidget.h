@@ -3,17 +3,17 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "SOTS_KEM_ManagerSubsystem.h"
-#include "SOTS_KEMAnchorDebugWidget.generated.h"
+#include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.generated.h"
 
 class AActor;
 
 UCLASS(Abstract, Blueprintable)
-class SOTS_KILLEXECUTIONMANAGER_API USOTS_KEMAnchorDebugWidget : public UUserWidget
+class SOTS_KILLEXECUTIONMANAGER_API USOTS_KillExecutionManagerKEMAnchorDebugWidget : public UUserWidget
 {
     GENERATED_BODY()
 
 public:
-    USOTS_KEMAnchorDebugWidget(const FObjectInitializer& ObjectInitializer);
+    USOTS_KillExecutionManagerKEMAnchorDebugWidget(const FObjectInitializer& ObjectInitializer);
 
     UFUNCTION(BlueprintCallable, Category="SOTS|KEM|Debug")
     void SetCenterActor(AActor* Actor);

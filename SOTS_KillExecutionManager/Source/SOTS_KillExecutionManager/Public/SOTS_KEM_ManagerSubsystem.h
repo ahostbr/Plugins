@@ -193,7 +193,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KEM")
     TArray<TSoftObjectPtr<USOTS_KEM_ExecutionDefinition>> ExecutionDefinitions;
 
-    UPROPERTY(EditAnywhere, Config, Category="KEM")
+    UPROPERTY(EditAnywhere, Category="KEM")
     TSoftObjectPtr<USOTS_KEM_ExecutionCatalog> ExecutionCatalog;
 
     // Optional ability requirement library used to resolve requirements by
@@ -218,7 +218,7 @@ public:
     UPROPERTY(EditAnywhere, Config, Category="KEM|Debug", meta=(ClampMin="0.0"))
     float AnchorSearchRadius = 600.f;
 
-    UPROPERTY(EditAnywhere, Config, Category="KEM|Fallback")
+    UPROPERTY(EditAnywhere, Category="KEM|Fallback")
     TObjectPtr<UAnimMontage> FallbackMontage = nullptr;
 
     UPROPERTY(EditAnywhere, Config, Category="KEM|Fallback", meta=(ClampMin="0.0"))

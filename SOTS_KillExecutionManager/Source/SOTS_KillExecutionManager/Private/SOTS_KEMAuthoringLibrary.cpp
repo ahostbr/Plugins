@@ -2,7 +2,7 @@
 
 #include "Containers/Map.h"
 #include "SOTS_KEM_ManagerSubsystem.h"
-#include "UObjectIterator.h"
+#include "UObject/UObjectIterator.h"
 
 namespace
 {

@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "SOTS_KEM_ManagerSubsystem.h"
 
 namespace

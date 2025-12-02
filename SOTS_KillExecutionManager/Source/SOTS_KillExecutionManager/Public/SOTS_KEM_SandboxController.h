@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "GameplayTagContainer.h"
 #include "SOTS_KEM_Types.h"
 #include "SOTS_KEM_ManagerSubsystem.h"

@@ -322,21 +322,20 @@ USOTS_KEMManagerSubsystem* USOTS_KEMManagerSubsystem::Get(const UObject* WorldCo
         return nullptr;
     }
 
-    const UGameInstance* GameInstance = WorldContextObject->GetGameInstance();
-    if (!GameInstance)
+    if (UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(WorldContextObject))
     {
-        if (const UWorld* World = WorldContextObject->GetWorld())
+        return GameInstance->GetSubsystem<USOTS_KEMManagerSubsystem>();
+    }
+
+    if (const UWorld* World = WorldContextObject->GetWorld())
+    {
+        if (UGameInstance* WorldGameInstance = World->GetGameInstance())
         {
-            GameInstance = World->GetGameInstance();
+            return WorldGameInstance->GetSubsystem<USOTS_KEMManagerSubsystem>();
         }
     }
 
-    if (!GameInstance)
-    {
-        return nullptr;
-    }
-
-    return GameInstance->GetSubsystem<USOTS_KEMManagerSubsystem>();
+    return nullptr;
 }
 
 void USOTS_KEMManagerSubsystem::SetAbilityRequirementLibrary(USOTS_AbilityRequirementLibraryAsset* InLibrary)
