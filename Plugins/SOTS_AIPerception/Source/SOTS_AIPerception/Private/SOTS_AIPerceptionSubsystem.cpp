@@ -1,6 +1,7 @@
 #include "SOTS_AIPerceptionSubsystem.h"
 
 #include "SOTS_AIPerceptionComponent.h"
+#include "SOTS_NoiseTagRegistry.h"
 #include "GameplayTagContainer.h"
 #include "Engine/World.h"
 
@@ -34,6 +35,8 @@ void USOTS_AIPerceptionSubsystem::ReportNoise(AActor* Instigator, const FVector&
     {
         return;
     }
+
+    SOTSNoiseTagRegistryHelpers::ResolveNoiseTag(World, NoiseTag);
 
     const float ClampedLoudness = FMath::Clamp(Loudness, 0.0f, 1.0f);
 

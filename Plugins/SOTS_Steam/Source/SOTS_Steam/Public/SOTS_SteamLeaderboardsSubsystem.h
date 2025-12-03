@@ -159,4 +159,9 @@ private:
 
     UPROPERTY()
     bool bLeaderboardsLoaded = false;
+
+    bool GatherOnlineInterfacesForLeaderboards(
+        IOnlineLeaderboardsPtr& OutLeaderboards,
+        IOnlineIdentityPtr& OutIdentity,
+        TSharedPtr<const FUniqueNetId>& OutUserId) const;
 };

@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Subsystems/SubsystemCollection.h"
 #include "SOTS_GameplayTagManagerSubsystem.h"
 #include "SOTS_MMSSSubsystem.h"
 #include "SOTS_MissionDirectorSubsystem.h"
@@ -12,10 +13,26 @@
 #include "SOTS_StatsComponent.h"
 #include "Components/ActorComponent.h"
 #include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.h"
+#include "SOTS_SuiteDebugReportConfig.h"
+#include "Templates/Function.h"
+#include "UObject/SoftObjectPtr.h"
+#include "UObject/SoftObjectPath.h"
 #include "SOTS_SuiteDebugSubsystem.generated.h"
 
 class UWorld;
 class AActor;
+
+namespace SOTS_SuiteDebugReportIds
+{
+    inline const FName GlobalStealth(TEXT("GlobalStealth"));
+    inline const FName MissionDirector(TEXT("MissionDirector"));
+    inline const FName Music(TEXT("Music"));
+    inline const FName TagManager(TEXT("TagManager"));
+    inline const FName FX(TEXT("FX"));
+    inline const FName Inventory(TEXT("Inventory"));
+    inline const FName Stats(TEXT("Stats"));
+    inline const FName Abilities(TEXT("Abilities"));
+}
 
 /**
  * A read-only game instance subsystem that aggregates state across SOTS subsystems
@@ -72,6 +89,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "SOTS|Debug")
     void DumpSuiteStateToLog() const;
 
+    /** Reload the report configuration asset and refresh filtered report toggles. */
+    UFUNCTION(BlueprintCallable, Category = "SOTS|Debug")
+    void ReloadSuiteDebugReports();
+
+    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+    virtual void Deinitialize() override;
+
     UFUNCTION(BlueprintCallable, Category = "SOTS|KEM|Debug")
     void ToggleKEMAnchorOverlay();
 
@@ -95,5 +119,20 @@ protected:
     void HideKEMAnchorOverlay();
 
 private:
+    void RegisterReportProviders();
+    void RefreshReportSettings();
+    TArray<FSOTS_SuiteDebugReport> BuildDefaultReportSettings() const;
+    FString BuildReportLine(const FSOTS_SuiteDebugReport& Report) const;
+    const FSoftObjectPath& GetDefaultReportConfigPath() const;
+
+    // Report configuration --------------------------------------------------
+    UPROPERTY(EditAnywhere, Category = "SOTS|Debug")
+    TSoftObjectPtr<USOTS_SuiteDebugReportConfig> ReportConfigAsset;
+
+    /** Runtime copy of the report toggles taken from the config asset. */
+    TArray<FSOTS_SuiteDebugReport> ReportSettings;
+
+    TMap<FName, TFunction<FString()>> ReportProviders;
+
     TWeakObjectPtr<USOTS_KillExecutionManagerKEMAnchorDebugWidget> KEMAnchorDebugWidgetInstance;
 };

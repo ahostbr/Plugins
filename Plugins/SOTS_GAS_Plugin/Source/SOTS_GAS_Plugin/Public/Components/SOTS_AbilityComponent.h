@@ -10,6 +10,7 @@
 class USOTS_AbilityRegistrySubsystem;
 class USOTS_AbilityBase;
 class USOTS_AbilitySubsystem;
+class USOTS_AbilitySyncHelpers; // Forward declaration added
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSOTS_AbilitySimpleSignature, FGameplayTag, AbilityTag, F_SOTS_AbilityHandle, Handle);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSOTS_AbilityFailedSignature, FGameplayTag, AbilityTag, E_SOTS_AbilityActivationResult, Result);
@@ -38,6 +39,8 @@ UCLASS(ClassGroup=(SOTS), meta=(BlueprintSpawnableComponent))
 class SOTS_GAS_PLUGIN_API UAC_SOTS_Abilitys : public UActorComponent
 {
     GENERATED_BODY()
+
+    friend class USOTS_AbilitySyncHelpers; // Friend declaration added
 
 public:
     UAC_SOTS_Abilitys();
@@ -115,9 +118,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="SOTS Ability")
     bool ForceRemoveAbility(FGameplayTag AbilityTag);
 
+    /** Push runtime ability tags into the global ability subsystem (see USOTS_AbilitySyncHelpers for orchestrated syncs). */
     UFUNCTION(BlueprintCallable, Category="SOTS Ability|Profile")
     void PushProfileStateToSubsystem();
 
+    /** Pull granted abilities from the subsystem into this component (see USOTS_AbilitySyncHelpers for coordinated restores). */
     UFUNCTION(BlueprintCallable, Category="SOTS Ability|Profile")
     void PullProfileStateFromSubsystem();
 
@@ -158,10 +163,10 @@ protected:
     void BroadcastAbilityListChanged();
     void BroadcastAbilityStateChanged(FGameplayTag AbilityTag);
 
-protected:
-    UPROPERTY()
-    UActorComponent* InventoryComponent = nullptr;
+    void PushProfileStateToSubsystem_Internal(USOTS_AbilitySubsystem* OverrideSubsystem);
+    void PullProfileStateFromSubsystem_Internal(USOTS_AbilitySubsystem* OverrideSubsystem);
 
+protected:
     UPROPERTY()
     USOTS_AbilitySubsystem* AbilitySubsystem = nullptr;
 

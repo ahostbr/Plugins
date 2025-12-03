@@ -9,6 +9,8 @@
 #include "SOTS_KEM_Types.h"
 #include "SOTS_ProfileTypes.h"
 #include "SOTS_TagAccessHelpers.h"
+#include "SOTS_MissionEventTagRegistry.h"
+#include "SOTS_MMSSSubsystem.h"
 
 USOTS_MissionDirectorSubsystem::USOTS_MissionDirectorSubsystem()
     : bMissionActive(false)
@@ -41,6 +43,8 @@ void USOTS_MissionDirectorSubsystem::Initialize(FSubsystemCollectionBase& Collec
     LastDurationSecondsForProfile = 0.0f;
     bLastMissionCompletedForProfile = false;
     bLastMissionFailedForProfile = false;
+
+    MissionEventTagRegistry = SOTSMissionEventTagRegistryHelpers::LoadMissionEventTagRegistry();
 
     CachedStealthSubsystem = USOTS_GlobalStealthManagerSubsystem::Get(this);
     if (CachedStealthSubsystem)
@@ -77,6 +81,8 @@ void USOTS_MissionDirectorSubsystem::Deinitialize()
             KEM->OnExecutionEvent.RemoveDynamic(this, &USOTS_MissionDirectorSubsystem::HandleExecutionEvent);
         }
     }
+
+    MissionEventTagRegistry = nullptr;
 
     Super::Deinitialize();
 }
@@ -170,6 +176,11 @@ void USOTS_MissionDirectorSubsystem::StartMission(USOTS_MissionDefinition* Missi
                 FVector::ZeroVector,
                 FRotator::ZeroRotator);
         }
+    }
+
+    if (ActiveMission && ActiveMission->MusicTag_OnMissionStart.IsValid())
+    {
+        RequestMusicByTag(ActiveMission->MusicTag_OnMissionStart);
     }
 
     // Optional mission-start tag for profile / analytics systems.
@@ -362,6 +373,11 @@ void USOTS_MissionDirectorSubsystem::FailMission(const FGameplayTag& FailReasonT
         }
     }
 
+    if (ActiveMission && ActiveMission->MusicTag_OnMissionFailed.IsValid())
+    {
+        RequestMusicByTag(ActiveMission->MusicTag_OnMissionFailed);
+    }
+
     // Pop any mission-specific stealth config override.
     if (USOTS_GlobalStealthManagerSubsystem* GSM = USOTS_GlobalStealthManagerSubsystem::Get(this))
     {
@@ -470,6 +486,22 @@ void USOTS_MissionDirectorSubsystem::AppendEventInternal(const FSOTS_MissionEven
     OnEventLogged.Broadcast(Entry);
 }
 
+void USOTS_MissionDirectorSubsystem::RequestMusicByTag(const FGameplayTag& MusicTag)
+{
+    if (!MusicTag.IsValid())
+    {
+        return;
+    }
+
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (USOTS_MMSSSubsystem* Music = GI->GetSubsystem<USOTS_MMSSSubsystem>())
+        {
+            Music->RequestMusicByTag(this, MusicTag, true);
+        }
+    }
+}
+
 FName USOTS_MissionDirectorSubsystem::EvaluateRankFromScore(float FinalScore) const
 {
     // Simple placeholder curve. You can replace this with data-driven tuning later.
@@ -570,6 +602,11 @@ void USOTS_MissionDirectorSubsystem::EvaluateMissionCompletion()
                     FVector::ZeroVector,
                     FRotator::ZeroRotator);
             }
+        }
+
+        if (ActiveMission && ActiveMission->MusicTag_OnMissionCompleted.IsValid())
+        {
+            RequestMusicByTag(ActiveMission->MusicTag_OnMissionCompleted);
         }
 
         // Pop any mission-specific stealth config override.
@@ -822,7 +859,72 @@ bool USOTS_MissionDirectorSubsystem::IsObjectiveCompleted(FName ObjectiveId) con
 
 void USOTS_MissionDirectorSubsystem::NotifyMissionEvent(const FGameplayTag& EventTag)
 {
-    CompleteObjectiveByTag(EventTag);
+    const FSOTS_MissionEventTagDefinition* Definition = nullptr;
+    if (MissionEventTagRegistry)
+    {
+        Definition = MissionEventTagRegistry->FindDefinition(EventTag);
+    }
+
+    if (!Definition && EventTag.IsValid())
+    {
+        UE_LOG(LogSOTSMissionDirector, Verbose,
+            TEXT("Mission event tag %s has no registry entry; falling back to raw handling."),
+            *EventTag.ToString());
+    }
+
+    ProcessMissionEventDefinition(Definition, EventTag);
+}
+
+void USOTS_MissionDirectorSubsystem::ProcessMissionEventDefinition(const FSOTS_MissionEventTagDefinition* Definition, const FGameplayTag& EventTag)
+{
+    FSOTS_MissionEventLogEntry Entry;
+    Entry.TimeSinceStart = GetTimeSinceStart(this);
+    Entry.Category = Definition ? Definition->Category : ESOTSMissionEventCategory::Misc;
+
+    if (Definition && !Definition->Title.IsEmpty())
+    {
+        Entry.Title = Definition->Title;
+    }
+    else if (EventTag.IsValid())
+    {
+        Entry.Title = FText::FromString(EventTag.ToString());
+    }
+
+    Entry.Description = Definition ? Definition->Description : FText::GetEmpty();
+    Entry.ScoreDelta = Definition ? Definition->ScoreDelta : 0.0f;
+    Entry.bIsPenalty = Entry.ScoreDelta < 0.0f;
+    Entry.ContextTags = Definition ? Definition->ContextTags : FGameplayTagContainer();
+    if (EventTag.IsValid())
+    {
+        Entry.ContextTags.AddTag(EventTag);
+    }
+
+    AppendEventInternal(Entry);
+
+    if (Definition && Definition->FXTag.IsValid())
+    {
+        if (USOTS_FXManagerSubsystem* FX = USOTS_FXManagerSubsystem::Get())
+        {
+            FX->TriggerFXByTag(
+                this,
+                Definition->FXTag,
+                nullptr,
+                nullptr,
+                FVector::ZeroVector,
+                FRotator::ZeroRotator);
+        }
+    }
+
+    if (Definition && Definition->MusicTag.IsValid())
+    {
+        RequestMusicByTag(Definition->MusicTag);
+    }
+
+    const bool bShouldComplete = !Definition || Definition->bTriggersObjectiveCompletion;
+    if (bShouldComplete)
+    {
+        CompleteObjectiveByTag(EventTag);
+    }
 }
 
 void USOTS_MissionDirectorSubsystem::ForceFailObjective(FName ObjectiveId, const FString& Reason)

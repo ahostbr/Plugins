@@ -202,6 +202,8 @@ AIBT-internal stealth/suspicion logic is not trusted.
 
 AIS / AIBT_Boss projects are reference-only (examples, not brain code).
 
+AIBT is Blueprint Only Thirdy party
+
 SOTS_AIPerception responsibilities:
 
 Integrates with UAIPerception.
@@ -691,24 +693,11 @@ When VSCode Buddy edits any plugin:
 
 After changes, delete that plugin’s Binaries/ and Intermediate/ folders.
 
-Buddy must never trigger a build; builds happen in UE/IDE manually.
-
-Maintain separate forks for:
-
-Internal SOTS usage (e.g. SOTS_CommentLink internal)
-
-Public FAB versions (with SOTS references stripped)
-
-Any zip with LATEST in the name is the canonical snapshot for that plugin/system.
-
 Python DevTools Preference Law
 
 Whenever a requested change could be done more simply using the SOTS Python DevTools suite (mass edits, refactors, packaging, etc.):
 
 Explicitly alert the user and suggest using that system.
-
-The toolset is in the project as:
-SOTS_DevTools_Python_v1.0.zip
 
 SOTS Repo Overview (Snapshot – 2025-11-30)
 

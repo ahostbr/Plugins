@@ -8,8 +8,12 @@
 #include "SOTS_FXManagerSubsystem.h"
 #include "SOTS_UIAbilityLibrary.h"
 #include "SOTS_InventoryBridgeSubsystem.h"
+#include "SOTS_GameplayTagManagerSubsystem.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/Actor.h"
+#include "Math/UnrealMathUtility.h"
+#include "SOTS_ProfileTypes.h"
 
 namespace SOTSAbilityUIHelpers
 {
@@ -34,6 +38,22 @@ namespace SOTSAbilityUIHelpers
 	}
 }
 
+namespace SOTSAbilityComponentHelpers
+{
+    inline USOTS_GameplayTagManagerSubsystem* GetTagManager(const UWorld* World)
+    {
+        if (!World)
+        {
+            return nullptr;
+        }
+        if (UGameInstance* GameInstance = World->GetGameInstance())
+        {
+            return GameInstance->GetSubsystem<USOTS_GameplayTagManagerSubsystem>();
+        }
+        return nullptr;
+    }
+}
+
 UAC_SOTS_Abilitys::UAC_SOTS_Abilitys()
 {
     PrimaryComponentTick.bCanEverTick = false;
@@ -42,30 +62,6 @@ UAC_SOTS_Abilitys::UAC_SOTS_Abilitys()
 void UAC_SOTS_Abilitys::BeginPlay()
 {
     Super::BeginPlay();
-
-    // Attempt to locate the InvSP inventory component (BP_InventoryComponent) on the owning actor.
-    AActor* OwnerActor = GetOwner();
-    if (OwnerActor)
-    {
-        TArray<UActorComponent*> Components;
-        OwnerActor->GetComponents(Components);
-
-        for (UActorComponent* Component : Components)
-        {
-            if (!Component)
-            {
-                continue;
-            }
-
-            const FString ClassName = Component->GetClass()->GetName();
-            if (ClassName.Contains(TEXT("BP_InventoryComponent")))
-            {
-                InventoryComponent = Component;
-                break;
-            }
-        }
-    }
-
     if (!AbilitySubsystem)
     {
         AbilitySubsystem = USOTS_AbilitySubsystem::Get(this);
@@ -105,10 +101,41 @@ float UAC_SOTS_Abilitys::GetWorldTime() const
     return World ? World->GetTimeSeconds() : 0.0f;
 }
 
-bool UAC_SOTS_Abilitys::PassesOwnerTagGate(const F_SOTS_AbilityDefinition& /*Def*/) const
+bool UAC_SOTS_Abilitys::PassesOwnerTagGate(const F_SOTS_AbilityDefinition& Def) const
 {
-    // Hook into your global GameplayTag manager here if desired.
-    return true;
+    AActor* OwnerActor = GetOwner();
+    if (!OwnerActor)
+    {
+        return false;
+    }
+
+    const bool bHasRequiredTags = !Def.RequiredOwnerTags.IsEmpty();
+    const bool bHasBlockedTags = !Def.BlockedOwnerTags.IsEmpty();
+    if (!bHasRequiredTags && !bHasBlockedTags)
+    {
+        return true;
+    }
+
+    if (const UWorld* World = GetWorld())
+    {
+        if (USOTS_GameplayTagManagerSubsystem* TagManager = SOTSAbilityComponentHelpers::GetTagManager(World))
+        {
+            if (bHasRequiredTags && !TagManager->ActorHasAllTags(OwnerActor, Def.RequiredOwnerTags))
+            {
+                return false;
+            }
+
+            if (bHasBlockedTags && TagManager->ActorHasAnyTags(OwnerActor, Def.BlockedOwnerTags))
+            {
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    // If the TagManager is unavailable, treat tagged gates as conservatively failing.
+    return !bHasRequiredTags && !bHasBlockedTags;
 }
 
 bool UAC_SOTS_Abilitys::PassesSkillGate(const F_SOTS_AbilityDefinition& Def) const
@@ -157,42 +184,7 @@ int32 UAC_SOTS_Abilitys::QueryInventoryItemCount(const FGameplayTagContainer& Ta
         }
     }
 
-    if (!InventoryComponent)
-    {
-        return 0;
-    }
-
-    // The owning project must implement a Blueprint function on the inventory component with the signature:
-    //   Function GetTotalAmountByGameplayTag(ItemTag: GameplayTag) -> TotalAmount: int32
-    static const FName FuncName_GetTotalAmountByGameplayTag(TEXT("GetTotalAmountByGameplayTag"));
-    UFunction* GetTotalFunction = InventoryComponent->FindFunction(FuncName_GetTotalAmountByGameplayTag);
-    if (!GetTotalFunction)
-    {
-        return 0;
-    }
-
-    int32 TotalCount = 0;
-
-    TArray<FGameplayTag> TagArray;
-    Tags.GetGameplayTagArray(TagArray);
-
-    for (const FGameplayTag& Tag : TagArray)
-    {
-        struct FGetTotalAmountByGameplayTag_Params
-        {
-            FGameplayTag ItemTag;
-            int32 TotalAmount;
-        };
-
-        FGetTotalAmountByGameplayTag_Params Params;
-        Params.ItemTag = Tag;
-        Params.TotalAmount = 0;
-
-        InventoryComponent->ProcessEvent(GetTotalFunction, &Params);
-        TotalCount += Params.TotalAmount;
-    }
-
-    return TotalCount;
+    return 0;
 }
 
 bool UAC_SOTS_Abilitys::ConsumeInventoryItems(const FGameplayTagContainer& Tags, int32 Count) const
@@ -211,82 +203,7 @@ bool UAC_SOTS_Abilitys::ConsumeInventoryItems(const FGameplayTagContainer& Tags,
         }
     }
 
-    if (!InventoryComponent || Count <= 0)
-    {
-        return false;
-    }
-
-    // The owning project must implement a Blueprint function on the inventory component with the signature:
-    //   Function RemoveItemsByGameplayTag(ItemTag: GameplayTag, AmountToRemove: int32) -> RemovedAmount: int32, bSuccess: bool
-    static const FName FuncName_RemoveItemsByGameplayTag(TEXT("RemoveItemsByGameplayTag"));
-    UFunction* RemoveFunction = InventoryComponent->FindFunction(FuncName_RemoveItemsByGameplayTag);
-    if (!RemoveFunction)
-    {
-        return false;
-    }
-
-    static const FName FuncName_GetTotalAmountByGameplayTag(TEXT("GetTotalAmountByGameplayTag"));
-    UFunction* GetTotalFunction = InventoryComponent->FindFunction(FuncName_GetTotalAmountByGameplayTag);
-
-    int32 RemainingToConsume = Count;
-
-    TArray<FGameplayTag> TagArray;
-    Tags.GetGameplayTagArray(TagArray);
-
-    for (const FGameplayTag& Tag : TagArray)
-    {
-        if (RemainingToConsume <= 0)
-        {
-            break;
-        }
-
-        int32 AvailableForTag = 0;
-
-        if (GetTotalFunction)
-        {
-            struct FGetTotalAmountByGameplayTag_Params
-            {
-                FGameplayTag ItemTag;
-                int32 TotalAmount;
-            };
-
-            FGetTotalAmountByGameplayTag_Params GetParams;
-            GetParams.ItemTag = Tag;
-            GetParams.TotalAmount = 0;
-            InventoryComponent->ProcessEvent(GetTotalFunction, &GetParams);
-            AvailableForTag = GetParams.TotalAmount;
-        }
-
-        if (AvailableForTag <= 0)
-        {
-            continue;
-        }
-
-        const int32 ToRemoveForTag = FMath::Min(AvailableForTag, RemainingToConsume);
-
-        struct FRemoveItemsByGameplayTag_Params
-        {
-            FGameplayTag ItemTag;
-            int32 AmountToRemove;
-            int32 RemovedAmount;
-            bool bSuccess;
-        };
-
-        FRemoveItemsByGameplayTag_Params Params;
-        Params.ItemTag = Tag;
-        Params.AmountToRemove = ToRemoveForTag;
-        Params.RemovedAmount = 0;
-        Params.bSuccess = false;
-
-        InventoryComponent->ProcessEvent(RemoveFunction, &Params);
-
-        if (Params.bSuccess && Params.RemovedAmount > 0)
-        {
-            RemainingToConsume -= Params.RemovedAmount;
-        }
-    }
-
-    return RemainingToConsume <= 0;
+    return false;
 }
 
 bool UAC_SOTS_Abilitys::PassesInventoryGate(const F_SOTS_AbilityDefinition& Def) const

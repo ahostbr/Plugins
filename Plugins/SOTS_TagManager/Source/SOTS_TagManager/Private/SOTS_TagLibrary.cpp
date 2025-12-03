@@ -3,6 +3,7 @@
 
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "SOTS_TagConstants.h"
 #include "SOTS_GameplayTagManagerSubsystem.h"
 #include "GameFramework/Actor.h"
 
@@ -118,6 +119,111 @@ bool USOTS_TagLibrary::ActorHasAnyTag(const UObject* WorldContextObject, const A
 
     if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
     {
+
+FGameplayTag USOTS_TagLibrary::GetMissionStateStartedTag()
+{
+    return SOTS_TagConstants::MissionStateStarted();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionStateCompletedTag()
+{
+    return SOTS_TagConstants::MissionStateCompleted();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionStateFailedTag()
+{
+    return SOTS_TagConstants::MissionStateFailed();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventStartedTag()
+{
+    return SOTS_TagConstants::MissionEventStarted();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventCompletedTag()
+{
+    return SOTS_TagConstants::MissionEventCompleted();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventFailedTag()
+{
+    return SOTS_TagConstants::MissionEventFailed();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventPrimaryObjectiveTag()
+{
+    return SOTS_TagConstants::MissionEventPrimaryObjective();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventOptionalObjectiveTag()
+{
+    return SOTS_TagConstants::MissionEventOptionalObjective();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventRewardsGrantedTag()
+{
+    return SOTS_TagConstants::MissionEventRewardsGranted();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionEventAlertsTriggeredTag()
+{
+    return SOTS_TagConstants::MissionEventAlertsTriggered();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseTransitionAlertTag()
+{
+    return SOTS_TagConstants::NoiseTransitionAlert();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseTransitionDetectionTag()
+{
+    return SOTS_TagConstants::NoiseTransitionDetection();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseLevelLowTag()
+{
+    return SOTS_TagConstants::NoiseLevelLow();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseLevelMediumTag()
+{
+    return SOTS_TagConstants::NoiseLevelMedium();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseLevelHighTag()
+{
+    return SOTS_TagConstants::NoiseLevelHigh();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseSourceFootstepTag()
+{
+    return SOTS_TagConstants::NoiseSourceFootstep();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseSourceImpactTag()
+{
+    return SOTS_TagConstants::NoiseSourceImpact();
+}
+
+FGameplayTag USOTS_TagLibrary::GetNoiseSourceEnvironmentTag()
+{
+    return SOTS_TagConstants::NoiseSourceEnvironment();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionNoKillsTag()
+{
+    return SOTS_TagConstants::MissionNoKills();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionNoAlertsTag()
+{
+    return SOTS_TagConstants::MissionNoAlerts();
+}
+
+FGameplayTag USOTS_TagLibrary::GetMissionPerfectStealthTag()
+{
+    return SOTS_TagConstants::MissionPerfectStealth();
+}
         return Manager->ActorHasAnyTags(Target, Tags);
     }
 

@@ -491,6 +491,32 @@ bool USOTS_SteamLeaderboardsSubsystem::ShouldUseOnlineLeaderboards() const
     return true;
 }
 
+bool USOTS_SteamLeaderboardsSubsystem::GatherOnlineInterfacesForLeaderboards(
+    IOnlineLeaderboardsPtr& OutLeaderboards,
+    IOnlineIdentityPtr& OutIdentity,
+    TSharedPtr<const FUniqueNetId>& OutUserId) const
+{
+    if (!ShouldUseOnlineLeaderboards())
+    {
+        return false;
+    }
+
+    OutLeaderboards = GetOnlineLeaderboardsInterface();
+    OutIdentity = GetOnlineIdentityInterface();
+    OutUserId = GetPrimaryUserId();
+
+    if (!OutLeaderboards.IsValid() || !OutIdentity.IsValid() || !OutUserId.IsValid())
+    {
+        if (USOTS_SteamSettings::IsVerboseLoggingEnabled())
+        {
+            UE_LOG(LogSOTS_Steam, Verbose, TEXT("GatherOnlineInterfacesForLeaderboards - Online interfaces not ready."));
+        }
+        return false;
+    }
+
+    return true;
+}
+
 IOnlineSubsystem* USOTS_SteamLeaderboardsSubsystem::GetOnlineSubsystemSteam() const
 {
     return IOnlineSubsystem::Get(TEXT("STEAM"));
@@ -560,15 +586,10 @@ bool USOTS_SteamLeaderboardsSubsystem::TryPushScoreToOnline(
         return false;
     }
 
-    IOnlineLeaderboardsPtr Leaderboards = GetOnlineLeaderboardsInterface();
-    IOnlineIdentityPtr Identity = GetOnlineIdentityInterface();
-    if (!Leaderboards.IsValid() || !Identity.IsValid())
-    {
-        return false;
-    }
-
-    const TSharedPtr<const FUniqueNetId> UserId = GetPrimaryUserId();
-    if (!UserId.IsValid())
+    IOnlineLeaderboardsPtr Leaderboards;
+    IOnlineIdentityPtr Identity;
+    TSharedPtr<const FUniqueNetId> UserId;
+    if (!GatherOnlineInterfacesForLeaderboards(Leaderboards, Identity, UserId))
     {
         return false;
     }
@@ -766,11 +787,10 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamTopEntries(FName InternalId, in
         return;
     }
 
-    IOnlineLeaderboardsPtr Leaderboards = GetOnlineLeaderboardsInterface();
-    IOnlineIdentityPtr Identity = GetOnlineIdentityInterface();
-    TSharedPtr<const FUniqueNetId> UserId = GetPrimaryUserId();
-
-    if (!Leaderboards.IsValid() || !Identity.IsValid() || !UserId.IsValid())
+    IOnlineLeaderboardsPtr Leaderboards;
+    IOnlineIdentityPtr Identity;
+    TSharedPtr<const FUniqueNetId> UserId;
+    if (!GatherOnlineInterfacesForLeaderboards(Leaderboards, Identity, UserId))
     {
         OnSteamTopEntriesReceived.Broadcast(InternalId, LocalEntries, false);
         return;
@@ -859,11 +879,10 @@ void USOTS_SteamLeaderboardsSubsystem::QuerySteamAroundPlayer(FName InternalId, 
         return;
     }
 
-    IOnlineLeaderboardsPtr Leaderboards = GetOnlineLeaderboardsInterface();
-    IOnlineIdentityPtr Identity = GetOnlineIdentityInterface();
-    const TSharedPtr<const FUniqueNetId> UserId = GetPrimaryUserId();
-
-    if (!Leaderboards.IsValid() || !Identity.IsValid() || !UserId.IsValid())
+    IOnlineLeaderboardsPtr Leaderboards;
+    IOnlineIdentityPtr Identity;
+    TSharedPtr<const FUniqueNetId> UserId;
+    if (!GatherOnlineInterfacesForLeaderboards(Leaderboards, Identity, UserId))
     {
         OnSteamAroundPlayerEntriesReceived.Broadcast(InternalId, LocalEntries, false);
         return;

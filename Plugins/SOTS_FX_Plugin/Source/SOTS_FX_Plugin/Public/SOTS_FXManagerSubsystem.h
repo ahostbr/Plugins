@@ -3,8 +3,11 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "GameplayTagContainer.h"
+#include "UObject/SoftObjectPtr.h"
+#include "UObject/SoftObjectPath.h"
 #include "SOTS_ProfileTypes.h"
 #include "SOTSFXTypes.h"
+#include "SOTS_FXTagCatalog.h"
 #include "SOTS_FXManagerSubsystem.generated.h"
 
 class USOTS_FXCueDefinition;
@@ -86,13 +89,25 @@ public:
     UFUNCTION(BlueprintCallable, Category="SOTS|FX|Cues")
     void RequestFXCue(FGameplayTag FXCueTag, AActor* Instigator, AActor* Target);
 
+    /** Reload the FX tag catalog asset and repopulate the cue map. */
+    UFUNCTION(BlueprintCallable, Category="SOTS|FX|Cues")
+    void ReloadFXTagCatalog();
+
+    /** Returns true if the catalog contains a ready cue definition for the requested tag. */
+    UFUNCTION(BlueprintPure, Category="SOTS|FX|Cues")
+    bool IsCueReady(FGameplayTag CueTag) const;
+
     // -------------------------
     // Tag-driven FX job router
     // -------------------------
 
-    /** Libraries searched to resolve FX tags into definitions. */
+    /** Libraries searched to resolve FX tags into definitions when no cue catalog entry exists. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|FX", meta=(AllowPrivateAccess="true"))
     TArray<TObjectPtr<USOTS_FXDefinitionLibrary>> Libraries;
+
+    /** Catalog asset that maps canonical FX tags to cue definitions. */
+    UPROPERTY(EditAnywhere, Category="SOTS|FX")
+    TSoftObjectPtr<USOTS_FXTagCatalog> FXTagCatalogAsset = TSoftObjectPtr<USOTS_FXTagCatalog>(FSoftObjectPath(TEXT("/Game/DevTools/DA_FXTagCatalog.DA_FXTagCatalog")));
 
     /** Broadcast when an FX job is requested and resolved. */
     UPROPERTY(BlueprintAssignable, Category="SOTS|FX")
@@ -118,13 +133,16 @@ public:
 
 protected:
 
-    /** Tag → Cue definition map. */
+    /** Tag → Cue definition map populated from the catalog and manual registrations. */
     UPROPERTY()
     TMap<FGameplayTag, TObjectPtr<USOTS_FXCueDefinition>> CueMap;
 
     /** Cue definition → component pools. */
     UPROPERTY()
     TMap<TObjectPtr<USOTS_FXCueDefinition>, FSOTS_FXCuePool> CuePools;
+
+    /** Cues added manually at runtime; reapplied whenever the catalog reloads. */
+    TMap<FGameplayTag, TObjectPtr<USOTS_FXCueDefinition>> RuntimeCues;
 
 private:
 
@@ -141,10 +159,14 @@ private:
 
     // New helper path for gameplay-tag-driven FX jobs.
     const FSOTS_FXDefinition* FindDefinition(FGameplayTag FXTag) const;
+    const USOTS_FXCueDefinition* GetCueDefinition(FGameplayTag FXTag) const;
+    void PopulateCueMapFromCatalog();
+    const FSoftObjectPath& GetDefaultCatalogPath() const;
     void BroadcastResolvedFX(FGameplayTag FXTag,
                              AActor* Instigator,
                              AActor* Target,
                              const FSOTS_FXDefinition* Definition,
+                             const USOTS_FXCueDefinition* CueDefinition,
                              const FVector& Location,
                              const FRotator& Rotation,
                              ESOTS_FXSpawnSpace Space,

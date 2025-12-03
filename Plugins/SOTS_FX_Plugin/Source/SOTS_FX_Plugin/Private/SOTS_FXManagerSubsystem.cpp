@@ -2,6 +2,7 @@
 
 #include "SOTS_FXCueDefinition.h"
 #include "SOTS_FXDefinitionLibrary.h"
+#include "SOTS_FXTagCatalog.h"
 
 #include "Engine/World.h"
 #include "NiagaraComponent.h"
@@ -13,6 +14,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Actor.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "UObject/SoftObjectPath.h"
 
 TWeakObjectPtr<USOTS_FXManagerSubsystem> USOTS_FXManagerSubsystem::SingletonInstance = nullptr;
 
@@ -24,12 +26,14 @@ void USOTS_FXManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     CueMap.Reset();
     CuePools.Reset();
+    ReloadFXTagCatalog();
 }
 
 void USOTS_FXManagerSubsystem::Deinitialize()
 {
     CuePools.Reset();
     CueMap.Reset();
+    RuntimeCues.Reset();
 
     SingletonInstance = nullptr;
 
@@ -49,6 +53,7 @@ void USOTS_FXManagerSubsystem::RegisterCue(USOTS_FXCueDefinition* CueDefinition)
     }
 
     CueMap.FindOrAdd(CueDefinition->CueTag) = CueDefinition;
+    RuntimeCues.FindOrAdd(CueDefinition->CueTag) = CueDefinition;
 }
 
 FSOTS_FXHandle USOTS_FXManagerSubsystem::PlayCueByTag(FGameplayTag CueTag, const FSOTS_FXContext& Context)
@@ -201,6 +206,93 @@ void USOTS_FXManagerSubsystem::RequestFXCue(FGameplayTag FXCueTag, AActor* Insti
     TriggerFXByTag(WorldContext, FXCueTag, Instigator, Target, Location, FRotator::ZeroRotator);
 }
 
+void USOTS_FXManagerSubsystem::ReloadFXTagCatalog()
+{
+    if (!FXTagCatalogAsset.IsValid())
+    {
+        if (!FXTagCatalogAsset.ToSoftObjectPath().IsValid())
+        {
+            FXTagCatalogAsset = GetDefaultCatalogPath();
+        }
+
+        FXTagCatalogAsset.LoadSynchronous();
+    }
+
+    PopulateCueMapFromCatalog();
+}
+
+const USOTS_FXCueDefinition* USOTS_FXManagerSubsystem::GetCueDefinition(FGameplayTag FXTag) const
+{
+    if (!FXTag.IsValid())
+    {
+        return nullptr;
+    }
+
+    if (const TObjectPtr<USOTS_FXCueDefinition>* Found = CueMap.Find(FXTag))
+    {
+        return Found->Get();
+    }
+
+    return nullptr;
+}
+
+bool USOTS_FXManagerSubsystem::IsCueReady(FGameplayTag CueTag) const
+{
+    if (const USOTS_FXCueDefinition* Cue = GetCueDefinition(CueTag))
+    {
+        return Cue->NiagaraSystem.IsValid() || Cue->Sound.IsValid();
+    }
+
+    return false;
+}
+
+void USOTS_FXManagerSubsystem::PopulateCueMapFromCatalog()
+{
+    CueMap.Reset();
+
+    if (USOTS_FXTagCatalog* Catalog = FXTagCatalogAsset.Get())
+    {
+        for (const FSOTS_FXTagCatalogEntry& Entry : Catalog->Entries)
+        {
+            if (!Entry.FXTag.IsValid() || Entry.CueDefinition.IsNull())
+            {
+                continue;
+            }
+
+            if (USOTS_FXCueDefinition* Cue = Entry.CueDefinition.LoadSynchronous())
+            {
+                CueMap.FindOrAdd(Entry.FXTag) = Cue;
+                if (Cue->CueTag.IsValid() && Cue->CueTag != Entry.FXTag)
+                {
+                    UE_LOG(LogTemp, Verbose, TEXT("FX catalog tag mismatch: entry=%s cue=%s"), *Entry.FXTag.ToString(), *Cue->CueTag.ToString());
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("FX tag catalog entry %s references a missing cue definition."), *Entry.FXTag.ToString());
+            }
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("FX tag catalog asset missing at %s"), *FXTagCatalogAsset.ToSoftObjectPath().ToString());
+    }
+
+    for (const TPair<FGameplayTag, TObjectPtr<USOTS_FXCueDefinition>>& Pair : RuntimeCues)
+    {
+        if (Pair.Key.IsValid() && Pair.Value.IsValid())
+        {
+            CueMap.FindOrAdd(Pair.Key) = Pair.Value;
+        }
+    }
+}
+
+const FSoftObjectPath& USOTS_FXManagerSubsystem::GetDefaultCatalogPath() const
+{
+    static const FSoftObjectPath Path(TEXT("/Game/DevTools/DA_FXTagCatalog.DA_FXTagCatalog"));
+    return Path;
+}
+
 // -------------------------
 // Tag-driven FX job router
 // -------------------------
@@ -236,6 +328,7 @@ void USOTS_FXManagerSubsystem::BroadcastResolvedFX(
     AActor* Instigator,
     AActor* Target,
     const FSOTS_FXDefinition* Definition,
+    const USOTS_FXCueDefinition* CueDefinition,
     const FVector& Location,
     const FRotator& Rotation,
     ESOTS_FXSpawnSpace Space,
@@ -257,7 +350,12 @@ void USOTS_FXManagerSubsystem::BroadcastResolvedFX(
     Resolved.AttachComponent = AttachComponent;
     Resolved.AttachSocketName = AttachSocketName;
 
-    if (Definition)
+    if (CueDefinition)
+    {
+        Resolved.NiagaraSystem = CueDefinition->NiagaraSystem;
+        Resolved.Sound         = CueDefinition->Sound;
+    }
+    else if (Definition)
     {
         Resolved.NiagaraSystem = Definition->NiagaraSystem;
         Resolved.Sound         = Definition->Sound;
@@ -280,11 +378,13 @@ void USOTS_FXManagerSubsystem::TriggerFXByTag(
     (void)WorldContextObject;
 
     const FSOTS_FXDefinition* Definition = FindDefinition(FXTag);
+    const USOTS_FXCueDefinition* CueDefinition = GetCueDefinition(FXTag);
     BroadcastResolvedFX(
         FXTag,
         Instigator,
         Target,
         Definition,
+        CueDefinition,
         Location,
         Rotation,
         ESOTS_FXSpawnSpace::World,
@@ -313,11 +413,13 @@ void USOTS_FXManagerSubsystem::TriggerAttachedFXByTag(
     }
 
     const FSOTS_FXDefinition* Definition = FindDefinition(FXTag);
+    const USOTS_FXCueDefinition* CueDefinition = GetCueDefinition(FXTag);
     BroadcastResolvedFX(
         FXTag,
         Instigator,
         Target,
         Definition,
+        CueDefinition,
         Location,
         Rotation,
         ESOTS_FXSpawnSpace::AttachToComponent,

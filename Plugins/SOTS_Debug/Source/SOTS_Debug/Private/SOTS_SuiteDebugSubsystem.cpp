@@ -16,6 +16,8 @@
 #include "SOTS_GameplayTagManagerSubsystem.h"
 #include "SOTS_FXManagerSubsystem.h"
 #include "SOTS_KillExecutionManagerKEMAnchorDebugWidget.h"
+#include "SOTS_SuiteDebugReportConfig.h"
+#include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
 
 USOTS_SuiteDebugSubsystem* USOTS_SuiteDebugSubsystem::Get(const UObject* WorldContextObject)
@@ -38,6 +40,12 @@ USOTS_SuiteDebugSubsystem* USOTS_SuiteDebugSubsystem::Get(const UObject* WorldCo
     }
 
     return GameInstance->GetSubsystem<USOTS_SuiteDebugSubsystem>();
+}
+
+USOTS_SuiteDebugSubsystem::USOTS_SuiteDebugSubsystem()
+    : Super()
+{
+    ReportConfigAsset = GetDefaultReportConfigPath();
 }
 
 AActor* USOTS_SuiteDebugSubsystem::GetPlayerPawn() const
@@ -205,23 +213,133 @@ FString USOTS_SuiteDebugSubsystem::GetFXSummary() const
 
 void USOTS_SuiteDebugSubsystem::DumpSuiteStateToLog() const
 {
-    const FString GSM = GetGlobalStealthSummary();
-    const FString Mission = GetMissionDirectorSummary();
-    const FString MMSS = GetMusicSubsystemSummary();
-    const FString Tag = GetTagManagerSummary();
-    const FString Inv = GetInventorySummary();
-    const FString Stats = GetStatsSummary(5);
-    const FString Abil = GetAbilitiesSummary();
-
     UE_LOG(LogTemp, Log, TEXT("--- SOTS Suite State Dump ---"));
-    UE_LOG(LogTemp, Log, TEXT("%s"), *GSM);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Mission);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *MMSS);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Tag);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Inv);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Stats);
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Abil);
+
+    for (const FSOTS_SuiteDebugReport& Report : ReportSettings)
+    {
+        if (!Report.bIncludeInDump)
+        {
+            continue;
+        }
+
+        const TFunction<FString()>* Provider = ReportProviders.Find(Report.ReportId);
+        if (Provider && *Provider)
+        {
+            UE_LOG(LogTemp, Log, TEXT("%s"), *BuildReportLine(Report));
+        }
+        else
+        {
+            const FText DisplayName = Report.DisplayName.IsEmpty() ? FText::FromName(Report.ReportId) : Report.DisplayName;
+            UE_LOG(LogTemp, Log, TEXT("%s: <no provider>"), *DisplayName.ToString());
+        }
+    }
+
     UE_LOG(LogTemp, Log, TEXT("----------------------------"));
+}
+
+void USOTS_SuiteDebugSubsystem::ReloadSuiteDebugReports()
+{
+    if (!ReportConfigAsset.ToSoftObjectPath().IsValid())
+    {
+        ReportConfigAsset = GetDefaultReportConfigPath();
+    }
+
+    RefreshReportSettings();
+}
+
+void USOTS_SuiteDebugSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+    Super::Initialize(Collection);
+
+    if (!ReportConfigAsset.ToSoftObjectPath().IsValid())
+    {
+        ReportConfigAsset = GetDefaultReportConfigPath();
+    }
+
+    RegisterReportProviders();
+    RefreshReportSettings();
+}
+
+void USOTS_SuiteDebugSubsystem::Deinitialize()
+{
+    ReportProviders.Reset();
+    ReportSettings.Reset();
+
+    Super::Deinitialize();
+}
+
+void USOTS_SuiteDebugSubsystem::RegisterReportProviders()
+{
+    ReportProviders.Reset();
+
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::GlobalStealth, [this]() { return GetGlobalStealthSummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::MissionDirector, [this]() { return GetMissionDirectorSummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::Music, [this]() { return GetMusicSubsystemSummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::TagManager, [this]() { return GetTagManagerSummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::FX, [this]() { return GetFXSummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::Inventory, [this]() { return GetInventorySummary(); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::Stats, [this]() { return GetStatsSummary(5); });
+    ReportProviders.Emplace(SOTS_SuiteDebugReportIds::Abilities, [this]() { return GetAbilitiesSummary(); });
+}
+
+void USOTS_SuiteDebugSubsystem::RefreshReportSettings()
+{
+    if (!ReportConfigAsset.IsValid())
+    {
+        if (!ReportConfigAsset.ToSoftObjectPath().IsValid())
+        {
+            ReportSettings = BuildDefaultReportSettings();
+            return;
+        }
+
+        ReportConfigAsset.LoadSynchronous();
+    }
+
+    if (USOTS_SuiteDebugReportConfig* Config = ReportConfigAsset.Get())
+    {
+        ReportSettings = Config->Reports;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SuiteDebug reports: failed to load config %s"), *ReportConfigAsset.ToSoftObjectPath().ToString());
+        ReportSettings = BuildDefaultReportSettings();
+    }
+
+    for (FSOTS_SuiteDebugReport& Report : ReportSettings)
+    {
+        if (Report.DisplayName.IsEmpty() && Report.ReportId.IsValid())
+        {
+            Report.DisplayName = FText::FromName(Report.ReportId);
+        }
+    }
+}
+
+TArray<FSOTS_SuiteDebugReport> USOTS_SuiteDebugSubsystem::BuildDefaultReportSettings() const
+{
+    return {
+        {SOTS_SuiteDebugReportIds::GlobalStealth, FText::FromString(TEXT("Global Stealth")), true},
+        {SOTS_SuiteDebugReportIds::MissionDirector, FText::FromString(TEXT("Mission Director")), true},
+        {SOTS_SuiteDebugReportIds::Music, FText::FromString(TEXT("Music")), true},
+        {SOTS_SuiteDebugReportIds::TagManager, FText::FromString(TEXT("Tag Manager")), true},
+        {SOTS_SuiteDebugReportIds::FX, FText::FromString(TEXT("FX")), true},
+        {SOTS_SuiteDebugReportIds::Inventory, FText::FromString(TEXT("Inventory")), true},
+        {SOTS_SuiteDebugReportIds::Stats, FText::FromString(TEXT("Stats")), true},
+        {SOTS_SuiteDebugReportIds::Abilities, FText::FromString(TEXT("Abilities")), true},
+    };
+}
+
+FString USOTS_SuiteDebugSubsystem::BuildReportLine(const FSOTS_SuiteDebugReport& Report) const
+{
+    const TFunction<FString()>* Provider = ReportProviders.Find(Report.ReportId);
+    const FString Summary = (Provider && *Provider) ? (*Provider)() : TEXT("<no provider>");
+    const FText DisplayName = Report.DisplayName.IsEmpty() ? FText::FromName(Report.ReportId) : Report.DisplayName;
+    return FString::Printf(TEXT("%s: %s"), *DisplayName.ToString(), *Summary);
+}
+
+const FSoftObjectPath& USOTS_SuiteDebugSubsystem::GetDefaultReportConfigPath() const
+{
+    static const FSoftObjectPath Path(TEXT("/Game/DevTools/DA_SuiteDebugReports.DA_SuiteDebugReports"));
+    return Path;
 }
 
 void USOTS_SuiteDebugSubsystem::ToggleKEMAnchorOverlay()

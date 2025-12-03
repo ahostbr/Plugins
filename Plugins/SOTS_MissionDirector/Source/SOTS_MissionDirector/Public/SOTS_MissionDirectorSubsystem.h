@@ -4,6 +4,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SOTS_MissionDirectorTypes.h"
 #include "GameplayTagContainer.h"
+#include "SOTS_MissionEventTagRegistry.h"
 #include "SOTS_MissionDirectorSubsystem.generated.h"
 
 class AActor;
@@ -194,6 +195,9 @@ private:
     void AppendEventInternal(const FSOTS_MissionEventLogEntry& Entry);
     FName EvaluateRankFromScore(float FinalScore) const;
 
+    void ProcessMissionEventDefinition(const FSOTS_MissionEventTagDefinition* Definition, const FGameplayTag& EventTag);
+    void RequestMusicByTag(const FGameplayTag& MusicTag);
+
     // Mission-definition-driven helpers.
     void EvaluateMissionCompletion();
 
@@ -261,6 +265,9 @@ private:
 
     UPROPERTY()
     bool bLastMissionFailedForProfile = false;
+
+    UPROPERTY(Transient)
+    USOTS_MissionEventTagRegistry* MissionEventTagRegistry = nullptr;
 
 public:
     // Mission events (separate from scoring/debrief).

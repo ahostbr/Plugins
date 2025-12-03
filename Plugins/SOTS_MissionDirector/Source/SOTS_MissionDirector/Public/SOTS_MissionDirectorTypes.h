@@ -373,6 +373,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Mission|FX")
     FGameplayTag FXTag_OnMissionFailed;
 
+    // Optional music tags used to request mission-specific tracks via MMSS.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Mission|Music")
+    FGameplayTag MusicTag_OnMissionStart;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Mission|Music")
+    FGameplayTag MusicTag_OnMissionCompleted;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Mission|Music")
+    FGameplayTag MusicTag_OnMissionFailed;
+
     // Optional branching configuration: which missions can follow this one,
     // keyed by an outcome tag (e.g. MissionOutcome.Perfect, MissionOutcome.Failed).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SOTS|Mission")

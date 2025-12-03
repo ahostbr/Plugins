@@ -1,6 +1,7 @@
 #include "SOTS_AIPerceptionLibrary.h"
 
 #include "SOTS_AIPerceptionSubsystem.h"
+#include "SOTS_NoiseTagRegistry.h"
 #include "Engine/World.h"
 
 void USOTS_AIPerceptionLibrary::SOTS_ReportNoise(
@@ -21,9 +22,11 @@ void USOTS_AIPerceptionLibrary::SOTS_ReportNoise(
         return;
     }
 
+    const FGameplayTag SanitizedNoiseTag = SOTSNoiseTagRegistryHelpers::ResolveNoiseTag(World, NoiseTag);
+
     if (USOTS_AIPerceptionSubsystem* Subsys = World->GetSubsystem<USOTS_AIPerceptionSubsystem>())
     {
-        Subsys->ReportNoise(Instigator, Location, Loudness, NoiseTag);
+        Subsys->ReportNoise(Instigator, Location, Loudness, SanitizedNoiseTag);
     }
 }
 

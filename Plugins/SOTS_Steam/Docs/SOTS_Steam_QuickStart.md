@@ -74,3 +74,16 @@ LeaderboardsSubsystem->SubmitMissionResultToLeaderboards(Result, PlayerName, /*b
 ```
 
 Any achievement or leaderboard whose definition tags are a subset of `Result.AdditionalTags` (plus the built-in mission/difficulty tags) will be unlocked/updated automatically.
+
+## 5. Mission result → leaderboard tag mapping
+
+Leaderboards are selected via `FSOTS_SteamLeaderboardDefinition::Tags`. The mission director should populate `FSOTS_SteamMissionResult` with the tags shown below so the leaderboards that represent each challenge can be matched automatically.
+
+| Tag | Source | Meaning |
+| --- | --- | --- |
+| `SAS.Mission.<MissionName>` | `Result.MissionTag` | The canonical mission tag (e.g., `SAS.Mission.CastleInfiltration`). Shared by every leaderboard whose score depends on that mission run. |
+| `SAS.Difficulty.<Level>` | `Result.DifficultyTag` | Difficulty-specific leaderboards (e.g., `SAS.Difficulty.Hard`). Use one tag per difficulty level. |
+| `SAS.Mission.NoKills` / `SAS.Mission.NoAlerts` / `SAS.Mission.PerfectStealth` | `Result.bNoKills`, `Result.bNoAlerts`, `Result.bPerfectStealth` | Optional challenge tags added when the player fulfills those constraints; include them in leaderboard definitions that reward clean runs. |
+| Any designer-defined tag | `Result.AdditionalTags` | Use this for mission-specific modifiers (e.g., `SAS.Mission.Modifier.HiddenCache`). Leaderboards can include these tags to gate submissions to tricky variants.
+
+For every new leaderboard definition, ensure the relevant mission tag/difficulty tag combination is present so `SubmitMissionResultToLeaderboards` can find the match before posting the score.
