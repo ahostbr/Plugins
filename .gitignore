@@ -17,3 +17,6 @@ Thumbs.db
 .DS_Store
 *.zip
 *.zip
+/.github
+/Content
+/Plugins/DismembermentSystem
