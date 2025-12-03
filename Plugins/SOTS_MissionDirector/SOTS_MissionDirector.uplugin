@@ -38,6 +38,11 @@
       "Name": "SOTS_KillExecutionManager",
       "Enabled": true
     }
+    ,
+    {
+      "Name": "SOTS_MMSS",
+      "Enabled": true
+    }
   ],
   "SupportedTargetPlatforms": [
     "Win64"

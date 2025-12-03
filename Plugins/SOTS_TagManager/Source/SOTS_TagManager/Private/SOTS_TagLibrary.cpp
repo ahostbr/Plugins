@@ -119,6 +119,41 @@ bool USOTS_TagLibrary::ActorHasAnyTag(const UObject* WorldContextObject, const A
 
     if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
     {
+        return Manager->ActorHasAnyTags(Target, Tags);
+    }
+
+    return false;
+}
+
+bool USOTS_TagLibrary::ActorHasAllTags(const UObject* WorldContextObject, const AActor* Target, const FGameplayTagContainer& Tags)
+{
+    if (!Target)
+    {
+        return false;
+    }
+
+    if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
+    {
+        return Manager->ActorHasAllTags(Target, Tags);
+    }
+
+    return false;
+}
+
+bool USOTS_TagLibrary::ActorHasTagByName(const UObject* WorldContextObject, const AActor* Actor, FName TagName)
+{
+    if (!Actor)
+    {
+        return false;
+    }
+
+    if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
+    {
+        return Manager->ActorHasTagByName(Actor, TagName);
+    }
+
+    return false;
+}
 
 FGameplayTag USOTS_TagLibrary::GetMissionStateStartedTag()
 {
@@ -224,38 +259,4 @@ FGameplayTag USOTS_TagLibrary::GetMissionPerfectStealthTag()
 {
     return SOTS_TagConstants::MissionPerfectStealth();
 }
-        return Manager->ActorHasAnyTags(Target, Tags);
-    }
 
-    return false;
-}
-
-bool USOTS_TagLibrary::ActorHasAllTags(const UObject* WorldContextObject, const AActor* Target, const FGameplayTagContainer& Tags)
-{
-    if (!Target)
-    {
-        return false;
-    }
-
-    if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
-    {
-        return Manager->ActorHasAllTags(Target, Tags);
-    }
-
-    return false;
-}
-
-bool USOTS_TagLibrary::ActorHasTagByName(const UObject* WorldContextObject, const AActor* Actor, FName TagName)
-{
-    if (!Actor)
-    {
-        return false;
-    }
-
-    if (USOTS_GameplayTagManagerSubsystem* Manager = GetManager(WorldContextObject))
-    {
-        return Manager->ActorHasTagByName(Actor, TagName);
-    }
-
-    return false;
-}

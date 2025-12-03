@@ -59,7 +59,13 @@ void USOTS_HUDConfigDataAsset::ApplyStateForTag(const UObject* WorldContextObjec
     }
 }
 
-const FSOTS_HUDStateEntry* USOTS_HUDConfigDataAsset::FindStateForTag(FGameplayTag StateTag) const
+bool USOTS_HUDConfigDataAsset::FindStateForTag(FGameplayTag StateTag, FSOTS_HUDStateEntry& OutEntry) const
 {
-    return FindEntryForTag(StateEntries, StateTag);
+    if (const FSOTS_HUDStateEntry* Entry = FindEntryForTag(StateEntries, StateTag))
+    {
+        OutEntry = *Entry;
+        return true;
+    }
+
+    return false;
 }

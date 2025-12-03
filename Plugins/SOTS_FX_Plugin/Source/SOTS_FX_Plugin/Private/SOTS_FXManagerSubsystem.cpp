@@ -15,6 +15,7 @@
 #include "GameFramework/Actor.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/WeakObjectPtr.h"
 
 TWeakObjectPtr<USOTS_FXManagerSubsystem> USOTS_FXManagerSubsystem::SingletonInstance = nullptr;
 
@@ -240,7 +241,7 @@ bool USOTS_FXManagerSubsystem::IsCueReady(FGameplayTag CueTag) const
 {
     if (const USOTS_FXCueDefinition* Cue = GetCueDefinition(CueTag))
     {
-        return Cue->NiagaraSystem.IsValid() || Cue->Sound.IsValid();
+        return IsValid(Cue->NiagaraSystem) || IsValid(Cue->Sound);
     }
 
     return false;
@@ -280,7 +281,7 @@ void USOTS_FXManagerSubsystem::PopulateCueMapFromCatalog()
 
     for (const TPair<FGameplayTag, TObjectPtr<USOTS_FXCueDefinition>>& Pair : RuntimeCues)
     {
-        if (Pair.Key.IsValid() && Pair.Value.IsValid())
+        if (Pair.Key.IsValid() && IsValid(Pair.Value))
         {
             CueMap.FindOrAdd(Pair.Key) = Pair.Value;
         }

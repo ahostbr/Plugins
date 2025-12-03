@@ -61,7 +61,7 @@ public:
 
     /** Finds a matching HUD state entry for the provided tag. */
     UFUNCTION(BlueprintPure, Category = "SOTS|HUD")
-    const FSOTS_HUDStateEntry* FindStateForTag(FGameplayTag StateTag) const;
+    bool FindStateForTag(FGameplayTag StateTag, FSOTS_HUDStateEntry& OutEntry) const;
 
 protected:
     /** Mapping of gameplay tags to HUD/notification overrides. */

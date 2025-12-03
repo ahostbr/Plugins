@@ -42,12 +42,6 @@ USOTS_SuiteDebugSubsystem* USOTS_SuiteDebugSubsystem::Get(const UObject* WorldCo
     return GameInstance->GetSubsystem<USOTS_SuiteDebugSubsystem>();
 }
 
-USOTS_SuiteDebugSubsystem::USOTS_SuiteDebugSubsystem()
-    : Super()
-{
-    ReportConfigAsset = GetDefaultReportConfigPath();
-}
-
 AActor* USOTS_SuiteDebugSubsystem::GetPlayerPawn() const
 {
     if (!GetWorld())

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Misc/EnumRange.h"
 #include "SOTS_GlobalStealthTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -14,6 +15,8 @@ enum class ESOTSStealthLevel : uint8
     FullyDetected  UMETA(DisplayName="Fully Detected")
 };
 
+ENUM_RANGE_BY_FIRST_AND_LAST(ESOTSStealthLevel, ESOTSStealthLevel::Undetected, ESOTSStealthLevel::FullyDetected)
+
 // High-level, player-facing stealth tier used for UI / KEM / FX.
 UENUM(BlueprintType)
 enum class ESOTS_StealthTier : uint8
@@ -23,6 +26,8 @@ enum class ESOTS_StealthTier : uint8
     Danger        UMETA(DisplayName="Danger"),
     Compromised   UMETA(DisplayName="Compromised")
 };
+
+ENUM_RANGE_BY_FIRST_AND_LAST(ESOTS_StealthTier, ESOTS_StealthTier::Hidden, ESOTS_StealthTier::Compromised)
 
 USTRUCT(BlueprintType)
 struct FSOTS_PlayerStealthState

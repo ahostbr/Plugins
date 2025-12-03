@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "SOTS_GlobalStealthTypes.h"
+#include "SOTS_GameplayTagManagerSubsystem.h"
 #include "SOTS_GlobalStealth_TagsAndConfig.generated.h"
 
 USTRUCT(BlueprintType)
@@ -23,14 +25,14 @@ struct FSOTS_StealthModifierDescriptor
     FString Description;
 };
 
-UCLASS()
-class SOTS_GLOBALSTEALTHMANAGER_API USOTS_GlobalStealthTagLibrary : public UBlueprintFunctionLibrary
-{
+ UCLASS()
+ class SOTS_GLOBALSTEALTHMANAGER_API USOTS_GlobalStealthConfigTagLibrary : public UBlueprintFunctionLibrary
+ {
     GENERATED_BODY()
 
 public:
     UFUNCTION(BlueprintPure, Category="SOTS|Stealth|Tags")
-    static FGameplayTag GetStealthTierTag(const UObject* WorldContextObject, ESOTSStealthLevel Tier);
+    static FGameplayTag GetStealthTierTag(const UObject* WorldContextObject, ESOTS_StealthTier Tier);
 
     UFUNCTION(BlueprintPure, Category="SOTS|Stealth|Tags")
     static FGameplayTag GetStealthDetectionTag(const UObject* WorldContextObject);
@@ -70,14 +72,13 @@ namespace SOTS_GlobalStealthTagLibraryImpl
     }
 }
 
-inline FGameplayTag USOTS_GlobalStealthTagLibrary::GetStealthTierTag(const UObject* WorldContextObject, ESOTSStealthLevel Tier)
+ inline FGameplayTag USOTS_GlobalStealthConfigTagLibrary::GetStealthTierTag(const UObject* WorldContextObject, ESOTS_StealthTier Tier)
 {
-    static const TMap<ESOTSStealthLevel, FName> TierMap = {
-        { ESOTSStealthLevel::Hidden, FName("SAS.Stealth.Tier.Hidden") },
-        { ESOTSStealthLevel::Cautious, FName("SAS.Stealth.Tier.Cautious") },
-        { ESOTSStealthLevel::Alert, FName("SAS.Stealth.Tier.Alert") },
-        { ESOTSStealthLevel::Compromised, FName("SAS.Stealth.Tier.Compromised") },
-        { ESOTSStealthLevel::Detected, FName("SAS.Stealth.Tier.Detected") }
+    static const TMap<ESOTS_StealthTier, FName> TierMap = {
+        { ESOTS_StealthTier::Hidden, FName("SAS.Stealth.Tier.Hidden") },
+        { ESOTS_StealthTier::Cautious, FName("SAS.Stealth.Tier.Cautious") },
+        { ESOTS_StealthTier::Danger, FName("SAS.Stealth.Tier.Danger") },
+        { ESOTS_StealthTier::Compromised, FName("SAS.Stealth.Tier.Compromised") }
     };
 
     if (const FName* Name = TierMap.Find(Tier))
@@ -87,22 +88,22 @@ inline FGameplayTag USOTS_GlobalStealthTagLibrary::GetStealthTierTag(const UObje
     return FGameplayTag();
 }
 
-inline FGameplayTag USOTS_GlobalStealthTagLibrary::GetStealthDetectionTag(const UObject* WorldContextObject)
+ inline FGameplayTag USOTS_GlobalStealthConfigTagLibrary::GetStealthDetectionTag(const UObject* WorldContextObject)
 {
     return SOTS_GlobalStealthTagLibraryImpl::ResolveTag(WorldContextObject, FName("SAS.Stealth.Status.Detected"));
 }
 
-inline FGameplayTag USOTS_GlobalStealthTagLibrary::GetStealthSearchingTag(const UObject* WorldContextObject)
+ inline FGameplayTag USOTS_GlobalStealthConfigTagLibrary::GetStealthSearchingTag(const UObject* WorldContextObject)
 {
     return SOTS_GlobalStealthTagLibraryImpl::ResolveTag(WorldContextObject, FName("SAS.Stealth.Status.Searching"));
 }
 
-inline void USOTS_GlobalStealthTagLibrary::PopulateStealthTierTags(const UObject* WorldContextObject, TArray<FGameplayTag>& OutTags)
+ inline void USOTS_GlobalStealthConfigTagLibrary::PopulateStealthTierTags(const UObject* WorldContextObject, TArray<FGameplayTag>& OutTags)
 {
     OutTags.Reset();
-    for (ESOTSStealthLevel Tier : TEnumRange<ESOTSStealthLevel>())
+    for (ESOTS_StealthTier Tier : TEnumRange<ESOTS_StealthTier>())
     {
-        if (FGameplayTag Tag = GetStealthTierTag(WorldContextObject, Tier))
+        if (FGameplayTag Tag = GetStealthTierTag(WorldContextObject, Tier); Tag.IsValid())
         {
             OutTags.Add(Tag);
         }
