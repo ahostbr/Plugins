@@ -1,0 +1,741 @@
+YOUR CONTRACT WITH RYAN (v3)
+
+Always Open Zip Files In Your Project Files With Python
+
+All build logs for VSCode Buddy work are under:
+E:\SAS\ShadowsAndShurikens\Saved\Logs\
+
+When a new SOTS chat starts, re-read SOTS_Suite_ExtendedMemory_LAWs.txt before giving design/architecture advice.
+
+Always keep the full SOTS / plugin-suite architecture and long-term goals in mind.
+
+Maintain strict continuity with all previous laws and decisions; if something must be overturned, call it out explicitly.
+
+Track exactly which systems, plugins, and files are touched in every mega-prompt.
+
+Design each VSCode Buddy mega-prompt so it can be executed in one clear pass, with:
+
+No ambiguity
+
+No hidden steps
+
+Whenever a new decision / pattern / rule emerges, explicitly recommend adding it to SOTS_Suite_ExtendedMemory_LAWs.txt.
+
+Treat correctness, consistency, and long-term maintainability as non-negotiable.
+
+Any file with LATEST in the name is canonical for that system if there’s a conflict.
+
+MASTERPROMPTSPLAN_V001.zip is treated as a design codex.
+Actual implementation must always follow the latest Plugins_VXXXX_57FORK_LATEST.zip snapshot and the current LAW set.
+
+SOTS SUCCESS LOG (LATEST ENTRY)
+
+Date: 2025-11-30
+
+Estimate: ~90% chance of successfully shipping SOTS as envisioned
+
+Why it increased:
+
+Clear separation between design plan (MASTERPROMPTSPLAN_V001) and actual code state (Plugins_V0005_57FORK_LATEST).
+
+A concrete V2 prompt-phase strategy built around the new laws.
+
+Reduced risk of prompt drift and misaligned changes.
+
+CORE MODULE & SHARED DATA LAWS
+Profile Shared Module Law
+
+Ownership
+
+All shared profile types must live in the SOTS_ProfileShared plugin:
+
+FSOTS_ProfileSnapshot
+
+All FSOTS_*ProfileData slices
+
+Implementation files:
+
+Plugins/SOTS_ProfileShared/Source/SOTS_ProfileShared/Public/SOTS_ProfileTypes.h
+
+Plugins/SOTS_ProfileShared/Source/SOTS_ProfileShared/Private/...
+
+SOTS_ProfileTypes.generated.h is owned by the SOTS_ProfileShared module, never by the game module.
+
+Dependencies
+
+Any module (game or plugin) that needs profile structs:
+
+Adds "SOTS_ProfileShared" to its *.Build.cs dependencies.
+
+Includes the header as:
+#include "SOTS_ProfileTypes.h"
+
+No plugin may:
+
+Depend on the ShadowsAndShurikens game module.
+
+Include game-module headers just to reach profile types.
+
+No include-path hacks
+
+Build.cs files must never reach into Intermediate/Build/... to grab generated headers from the game.
+
+Fix for missing shared types is always: depend on SOTS_ProfileShared.
+
+Future shared data
+
+Any new data that must be shared between game and plugins belongs in:
+
+SOTS_ProfileShared, or
+
+Another dedicated shared plugin (not the game module).
+
+GLOBAL DIRECTION (ULTRA-COMPACT)
+
+Engine: UE 5.7, forked from the UE 5.4.4 SOTS project.
+
+SOTS: single-player only (no networking).
+
+Old CGF Blueprint-heavy backend is being retired.
+
+New backbone:
+
+C++ SOTS plugins + thin Blueprint glue.
+
+Third-party plugins (InvSP, ProHUDV2, AIBT, etc.):
+
+Treated as data/content helpers, not “brains”.
+
+SOTS logic lives in:
+
+SOTS plugins
+
+The SOTS game project
+(never in third-party plugins).
+
+TAG SYSTEM LAWS
+Tag System – Single Source of Truth
+
+SOTS_TagManager plugin is the only global gameplay tag authority.
+
+Key classes:
+
+USOTS_GameplayTagManagerSubsystem (GameInstanceSubsystem)
+
+USOTS_TagLibrary (BlueprintFunctionLibrary)
+
+SOTS_TagAccessHelpers (helpers for C++/Blueprint)
+
+All systems (GSM, Abilities, KEM, MissionDirector, AIPerception, FX, SkillTree, UI, etc.) must query/mutate global tags via TagManager.
+
+Tag Spine Law
+
+All global gameplay state is represented as gameplay tags:
+
+Stealth tiers
+
+Detection state
+
+Mission flags
+
+Music roles (SAS.Music.*)
+
+Etc.
+
+These tags are owned and mutated only via:
+
+USOTS_GameplayTagManagerSubsystem
+
+USOTS_TagLibrary
+
+SOTS_TagAccessHelpers
+
+No other plugin may maintain its own global tag maps for cross-system state.
+
+TagManager Helper Law
+
+Any system that mutates global gameplay tags must go through:
+
+USOTS_GameplayTagManagerSubsystem, or
+
+Approved helpers (USOTS_TagLibrary, SOTS_TagAccessHelpers).
+
+Direct runtime writes using RequestGameplayTag + custom TMaps outside TagManager are disallowed.
+
+STEALTH, AI & PERCEPTION LAWS
+Stealth Backbone (GSM + LightProbes)
+
+Stealth ownership:
+
+USOTS_PlayerStealthComponent – player-side logic.
+
+USOTS_GlobalStealthManagerSubsystem (GSM) – global aggregation.
+
+LightProbePlugin – visibility/lighting checks feeding GSM.
+
+GSM is data-driven:
+
+Uses:
+
+FSOTS_StealthScoringConfig
+
+USOTS_StealthConfigDataAsset
+
+Exposes APIs for:
+
+Stealth score / tier
+
+Modifiers (difficulty, gear, mission state)
+
+Read-only access for abilities, KEM, FX, music, MissionDirector, etc.
+
+Law:
+
+AIBT never owns stealth logic.
+It only reacts to detection signals (tags, blackboard, events) coming from SOTS systems.
+
+AI, AIBT & Perception Spine
+
+AIBT is purely a behavior layer (state machines / behaviors).
+
+AIBT-internal stealth/suspicion logic is not trusted.
+
+AIS / AIBT_Boss projects are reference-only (examples, not brain code).
+
+SOTS_AIPerception responsibilities:
+
+Integrates with UAIPerception.
+
+Converts raw senses into SOTS detection tiers + tags.
+
+Notifies:
+
+GSM (for global stealth state changes).
+
+MissionDirector (for mission-related perception events).
+
+Feeds AI behavior via:
+
+Tags
+
+Blackboard
+
+Messages
+
+Perception Spine Law
+
+All AI perception state (LOS, suspicion tiers, awareness) flows through:
+
+USOTS_AIPerceptionComponent
+
+That component:
+
+Mutates tags via USOTS_GameplayTagManagerSubsystem.
+
+Notifies GSM via USOTS_GlobalStealthManagerSubsystem::NotifyAIPerceptionStateChanged.
+
+No other plugin talks directly to UAIPerception or owns global perception tags.
+
+Stealth Spine Composition Law
+
+The primary stealth/detection spine is:
+
+LightProbePlugin
+
+USOTS_GlobalStealthManagerSubsystem
+
+USOTS_PlayerStealthComponent
+
+USOTS_AIPerceptionComponent
+
+OmniTrace
+
+SOTS_FX_Plugin
+
+SOTS_SkillTree
+
+SOTS_MMSS
+
+SOTS_KillExecutionManager
+
+SOTS_MissionDirector
+
+All layered over SOTS_TagManager
+
+Future systems must hook into this existing spine, not invent new stealth stacks.
+
+PROFILE & STATS LAWS
+Profile Snapshot Law
+
+All long-term player progress is represented by:
+
+FSOTS_ProfileSnapshot
+
+FSOTS_*ProfileData slices
+
+Persistence is handled via:
+
+USOTS_ProfileSaveGame
+
+USOTS_ProfileSubsystem
+
+Each plugin owns its own FSOTS_*ProfileData slice, but serializes exclusively through the profile snapshot pipeline.
+
+No plugin is allowed to write separate .sav files.
+
+Stats Snapshot Law
+
+All character/NPC stats live on:
+
+USOTS_StatsComponent
+
+Runtime storage:
+
+TMap<FGameplayTag, float> StatValues
+
+These are serialized via:
+
+FSOTS_CharacterStateData.StatValues
+
+Inside FSOTS_ProfileSnapshot
+
+Stats are never saved separately; they always flow through the central profile snapshot.
+
+ABILITY & SKILLTREE LAWS
+SOTS_GAS Ability Spine Law
+
+Global definitions
+
+USOTS_AbilityRegistrySubsystem (in SOTS_GAS_Plugin) is the only global owner of ability definitions.
+
+It holds:
+
+AbilityTag -> F_SOTS_AbilityDefinition (usually authored in USOTS_AbilityDefinitionDA).
+
+Evaluates F_SOTS_AbilityRequirements via SOTS_GAS requirement/gating libraries.
+
+Per-actor runtime state
+
+UAC_SOTS_Abilitys on an actor is the only owner of that actor’s ability runtime state:
+
+Granted ability tags
+
+Charges
+
+Cooldowns
+
+Active flags (F_SOTS_AbilityRuntimeState)
+
+Drives USOTS_AbilityBase instances
+
+No other component or subsystem may keep a parallel ability runtime map.
+
+Save format
+
+F_SOTS_AbilityComponentSaveData (in SOTS_AbilityTypes.h) is the only serialized representation of a component’s ability state.
+
+All ability persistence flows through:
+
+F_SOTS_AbilityComponentSaveData
+
+Nested inside the profile system (e.g. FSOTS_AbilityProfileData → FSOTS_ProfileSnapshot)
+
+Orchestrated by USOTS_ProfileSubsystem
+
+No alternate ability save files or formats are allowed.
+
+Character snapshot mirror
+
+FSOTS_CharacterStateData may mirror thin views (e.g. equipped ability tags), but:
+
+The authoritative data (owned abilities, ranks, cooldowns, runtime snapshots) stays in:
+
+UAC_SOTS_Abilitys
+
+F_SOTS_AbilityComponentSaveData
+
+Restored via the profile pipeline.
+
+True Spine
+
+The actual gameplay ability spine is:
+USOTS_AbilityRegistrySubsystem + UAC_SOTS_Abilitys + USOTS_AbilityBase + profile integration.
+
+Player Ability System & Skill Tree (High-Level)
+
+SOTS uses a player-only ability system (no AI abilities here).
+
+Pattern:
+
+Backend: SOTS_GAS plugin (C++)
+
+Component façade: AC_SOTS_Abilitys / UAC_SOTS_Abilitys
+
+Data: DataAssets + gameplay tags
+
+SkillTree:
+
+USOTS_SkillTreeSubsystem owns all skill/progression state.
+
+All skill persistence flows through FSOTS_SkillTreeProfileData and the profile system.
+
+Abilities, stats, etc. must query skill gating via SkillTree helpers.
+
+Law:
+
+SOTS core & plugin suite do not depend on Gas_Graph for abilities.
+Ability backend is purely SOTS-owned.
+
+KEM (KILL EXECUTION MANAGER) LAWS
+KEM Execution Triggers
+
+Executions may only be triggered by:
+
+Player pressing interact while controlling the ninja.
+
+Player pressing interact while controlling the dragon.
+
+Cutscenes/Sequencer explicitly requesting an execution.
+
+No other actions may silently trigger executions.
+
+KEM Rules
+
+All executions are defined in Execution DataAssets (single source of truth).
+
+Integrations:
+
+OmniTrace for traces/placement.
+
+SOTS_FX_Plugin for audiovisual effects.
+
+GSM for stealth gating and detection consequences.
+
+MissionDirector for mission objective hooks (e.g. “kill target with specific execution”).
+
+UI, HUD & INVENTORY LAWS
+UI / HUD / ProHUDV2
+
+ProHUDV2 is:
+
+A visual layer for notifications and world-space waypoints.
+
+Not a global UI/HUD orchestrator.
+
+SOTS UI:
+
+Uses a push-pop UI stack (Lyra-inspired).
+
+Prefers diegetic HUD (dragon, stealth cues, minimal overlays).
+
+ProHUDV2 compass/minimap removed for SOTS.
+
+World/map info uses in-world markers and diegetic map scrolls, not a minimap.
+
+No heavy gameplay logic on Tick. HUD & UI logic must be:
+
+Event-driven
+
+Tag-driven
+
+HUD Bridge Law
+
+SOTS_UI plugin owns:
+
+USOTS_HUDSubsystem
+
+USOTS_NotificationSubsystem
+
+USOTS_WaypointSubsystem
+
+These are the only backends for:
+
+HUD bars/meters
+
+Transient notifications
+
+World-space waypoints
+
+Widgets + ProHUDV2 components:
+
+Read from these subsystems
+
+Never talk directly to gameplay plugins.
+
+Inventory / Items & InvSP
+
+Inventory System Pro (InvSP) remains the core inventory backend.
+
+SOTS wraps it with a diegetic Bamboo Scroll interface.
+
+No weight-based inventory (this is not a survival/RPG).
+
+Items:
+
+Real, physical ninja tools:
+
+Poisons, darts, traps, shuriken, lures, etc.
+
+Hooked into abilities and stealth via tags (e.g. poison type, noise level).
+
+Persistence:
+
+Save structure:
+
+Uses profile folders + central gamesettings.sav for global metadata.
+
+Inventory is stored per-profile, not in a separate savegame_inventory1.sav.
+
+Inventory Bridge Law
+
+USOTS_InventoryBridgeSubsystem (in SOTS_INV) is the only bridge between InvSP and SOTS.
+
+Inventory persistence flows through:
+
+FSOTS_InventoryProfileData
+
+Bridge caches
+
+No other plugin saves inventory directly to disk or bypasses the bridge.
+
+InvSP Bridge Implementation Law
+
+USOTS_InventoryBridgeSubsystem mirrors:
+
+InvSP’s live inventories
+
+Quickslots
+
+It syncs to/from FSOTS_InventoryProfileData.
+
+All inventory Blueprint operations go through the bridge.
+
+USOTS_ProfileSubsystem only reads/writes FSOTS_InventoryProfileData via this bridge (never InvSP directly).
+
+FX, MUSIC & MISSION LAWS
+OmniTrace
+
+General-purpose tracing & path helper library.
+
+Preferred over raw Blueprint trace spaghetti.
+
+Used by:
+
+KEM
+
+Parkour
+
+Abilities
+
+AI helpers
+
+Environment tools
+
+Presets + debug viz are DataAsset-driven.
+
+FX / Music / MetaSounds (Spine)
+
+SOTS_FX_Plugin (planned/exists):
+
+Global VFX/SFX manager.
+
+High-level APIs that take tags/contexts and resolve to:
+
+Niagara systems
+
+Sounds
+
+Used by:
+
+KEM
+
+Abilities
+
+MissionDirector
+
+GSM
+
+UI
+
+Music Manager / MMSS:
+
+Uses SAS.Music.* tag schema:
+
+SAS.Music.Global.MainMenu, .Credits, .Safehouse
+
+SAS.Music.Role.Main, .Tension, .Alert, .StealthHeavy, .Exploration, .Safehouse
+
+SAS.Music.Boss.Intro/Loop/Phase2/Outro
+
+Reads:
+
+GSM state
+
+MissionDirector state
+
+Fades/transitions are data-driven (curves, config DAs).
+
+MMSS Spine Law
+
+USOTS_MMSSSubsystem + FSOTS_MMSSProfileData are the single source of truth for:
+
+Persistent music state (current role tag, track ID, playback position).
+
+Other systems (GSM, MissionDirector, FX, KEM, UI, etc.):
+
+Request music changes via MMSS.
+
+Do not store their own track state or playback time.
+
+Music roles are represented using FGameplayTag, usually SAS.Music.Role.*.
+
+MISSIONDIRECTOR & GAS_GRAPH LAWS
+MissionDirector & Graph Editing (High-Level Plan)
+
+MissionDirector will use a generic graph-based mission editor:
+
+Similar to GenericGraph / LogicDriver style.
+
+Graph should include:
+
+Objective nodes
+
+Branching routes
+
+Fail states
+
+Optional routes
+
+Inputs from:
+
+GSM (stealth status)
+
+KEM (kill types)
+
+AIPerception (alert states)
+
+FX/MMSS (cues)
+
+Graphs must be:
+
+Data-centric, not hard-coded to a specific map.
+
+Reusable across missions/difficulties.
+
+Gas_Graph Isolation Law
+
+Gas_Graph and Gas_Graph_Items are removed from SOTS gameplay.
+
+They may exist as a separate marketplace plugin, but:
+
+SOTS core systems do not depend on them.
+
+MissionDirector may later use a generic graph solution, but:
+
+This work is decoupled from the ability system and SOTS shipping requirements.
+
+BLUEPRINT VS C++ PHILOSOPHY
+
+C++ owns:
+
+Core systems:
+
+Stealth
+
+TagManager
+
+MissionDirector
+
+Perception
+
+Abilities backend
+
+Profile system
+
+Blueprints are for:
+
+Wiring
+
+Mission scripting
+
+UI views
+
+High-level game logic
+
+Rules:
+
+No heavy gameplay logic on Tick.
+
+Existing UMG widgets keep their visuals/animations, but:
+
+Their backends get rewired to the new C++ subsystems.
+
+Third-party plugins must be wrapped in SOTS subsystems, not called directly from random Blueprints.
+
+PLUGIN SLICE & WORKFLOW LAWS
+Plugin Slice Law
+
+Every SOTS plugin with persistent state must expose on its primary subsystem:
+
+BuildProfileData(FSOTS_*ProfileData& OutData)
+
+ApplyProfileData(const FSOTS_*ProfileData& InData)
+
+USOTS_ProfileSubsystem is the only orchestrator that builds/applies the combined FSOTS_ProfileSnapshot.
+
+No plugin writes standalone .sav files or bypasses this.
+
+Workflow & VSCode Buddy Laws
+
+When VSCode Buddy edits any plugin:
+
+After changes, delete that plugin’s Binaries/ and Intermediate/ folders.
+
+Buddy must never trigger a build; builds happen in UE/IDE manually.
+
+Maintain separate forks for:
+
+Internal SOTS usage (e.g. SOTS_CommentLink internal)
+
+Public FAB versions (with SOTS references stripped)
+
+Any zip with LATEST in the name is the canonical snapshot for that plugin/system.
+
+Python DevTools Preference Law
+
+Whenever a requested change could be done more simply using the SOTS Python DevTools suite (mass edits, refactors, packaging, etc.):
+
+Explicitly alert the user and suggest using that system.
+
+The toolset is in the project as:
+SOTS_DevTools_Python_v1.0.zip
+
+SOTS Repo Overview (Snapshot – 2025-11-30)
+
+Root project: ShadowsAndShurikens (UE 5.7, engine at E:/UE_5.7p/UE_5.7).
+
+Main game module: Source/ShadowsAndShurikens (game + editor target).
+
+All core runtime systems live in SOTS_* plugins under Plugins/ — the project core should stay thin and not depend directly on plugin internals.
+
+Core hubs:
+
+SOTS_TagManager: global gameplay tag cache + actor tag helpers (USOTS_GameplayTagManagerSubsystem).
+
+SOTS_ProfileShared: all FSOTS_* snapshot structs for save/load across the whole suite.
+
+SOTS_GlobalStealthManager: global stealth tiers & aggregation (USOTS_GlobalStealthManagerSubsystem, SOTS_PlayerStealthComponent).
+
+Plugin categories:
+
+Progression / abilities: SOTS_Stats, SOTS_SkillTree, SOTS_GAS_Plugin.
+
+Stealth / AI / missions: SOTS_AIPerception, SOTS_GlobalStealthManager, SOTS_KillExecutionManager, SOTS_MissionDirector.
+
+UI / inventory / audio: SOTS_UI (HUD, notifications, waypoints), SOTS_INV (inventory bridge), SOTS_MMSS (music), SOTS_FX_Plugin (global FX).
+
+Utility / tools: OmniTrace, BEP, LightProbePlugin, etc.
+
+Dev tools: DevTools/python/ is the automation hub; sots_tools.py + sots_tools_config.json define the canonical build + GenerateProjectFiles commands and should be treated as the default way to build/analyze the project.
+
+For the full plugin-by-plugin breakdown and dependency map, see the separate doc: Docs/SOTS_RepoOverview.md (this is the human/LLM-friendly architecture map and should be kept in sync with reality).

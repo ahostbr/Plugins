@@ -1,0 +1,142 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "Samples",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "ShadowsAndShurikens",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "AnimationWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "RigLogic",
+			"Enabled": true
+		},
+		{
+			"Name": "LiveLink",
+			"Enabled": true
+		},
+		{
+			"Name": "LiveLinkControlRig",
+			"Enabled": true
+		},
+		{
+			"Name": "PoseSearch",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationLocomotionLibrary",
+			"Enabled": true
+		},
+		{
+			"Name": "MotionWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "HairStrands",
+			"Enabled": true
+		},
+		{
+			"Name": "Chooser",
+			"Enabled": true
+		},
+		{
+			"Name": "Mover",
+			"Enabled": true
+		},
+		{
+			"Name": "NetworkPrediction",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_Stats",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_ProfileShared",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_TagManager",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_AIPerception",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_GlobalStealthManager",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "SOTS_FX_Plugin",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_SkillTree",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "SOTS_INV",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_GAS_Plugin",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_UI",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_MMSS",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_MissionDirector",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "SOTS_KillExecutionManager",
+			"Enabled": true
+		},
+		{
+			"Name": "SOTS_Debug",
+			"Enabled": true
+		},
+		{
+			"Name": "OmniTrace",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
+		}
+	],
+	"EpicSampleNameHash": "1673045636"
+}
