@@ -136,6 +136,14 @@
 			"SupportedTargetPlatforms": [
 				"Win64"
 			]
+		},
+		{
+			"Name": "BlueprintExporter",
+			"Enabled": true
+		},
+		{
+			"Name": "JsonBlueprintUtilities",
+			"Enabled": true
 		}
 	],
 	"EpicSampleNameHash": "1673045636"

@@ -22,4 +22,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "SOTS|BPGen")
     static FSOTS_BPGenApplyResult ApplyGraphSpecToFunction(const UObject* WorldContextObject, const FSOTS_BPGenFunctionDef& FunctionDef, const FSOTS_BPGenGraphSpec& GraphSpec);
+
+    /**
+     * Debug/test helper: builds Test_AllNodesGraph on BP_PrintHello using BPGen specs.
+     */
+    UFUNCTION(BlueprintCallable, CallInEditor, Category = "SOTS|BPGen|Test")
+    static FSOTS_BPGenApplyResult BuildTestAllNodesGraphForBPPrintHello();
 };

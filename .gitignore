@@ -22,3 +22,5 @@ WORKING/
 Thumbs.db
 .DS_Store
 *.zip
+/Plugins/KibibyteLabs
+/BlueprintExports

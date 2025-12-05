@@ -164,6 +164,12 @@ struct FSOTS_BPGenGraphNode
 	FString FunctionPath;
 
 	/**
+	 * Optional struct path for struct nodes (e.g. "/Script/Engine.Vector").
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BPGen|Graph")
+	FString StructPath;
+
+	/**
 	 * Optional variable name for variable nodes
 	 * (e.g. "AbilityData", "Health", etc.).
 	 */
@@ -273,3 +279,17 @@ struct FSOTS_BPGenApplyResult
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BPGen|Result")
 	TArray<FString> Warnings;
 };
+
+// Canonical node type names used by BPGen graph specs.
+namespace SOTS_BPGenNodeTypes
+{
+	inline const FName FunctionEntry(TEXT("K2Node_FunctionEntry"));
+	inline const FName FunctionResult(TEXT("K2Node_FunctionResult"));
+	inline const FName Knot(TEXT("K2Node_Knot"));
+	inline const FName EnumLiteral(TEXT("K2Node_EnumLiteral"));
+	inline const FName MakeStruct(TEXT("K2Node_MakeStruct"));
+	inline const FName BreakStruct(TEXT("K2Node_BreakStruct"));
+	inline const FName Select(TEXT("K2Node_Select"));
+	inline const FName Event(TEXT("K2Node_Event"));
+	inline const FName CustomEvent(TEXT("K2Node_CustomEvent"));
+}

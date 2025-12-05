@@ -1,6 +1,4 @@
 ﻿#include "SOTS_CharacterBase.h"
-// Ensure the module header is the very first include in this translation unit
-#include "SOTS_CharacterBase.h"
 
 #include "SOTS_ProfileTypes.h"
 ASOTS_CharacterBase::ASOTS_CharacterBase(const FObjectInitializer& ObjectInitializer)

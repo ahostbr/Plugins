@@ -1,50 +1,46 @@
 #include "SOTS_BPGenBuilder.h"
 #include "SOTS_BlueprintGen.h"
+#include "SOTS_BPGenTypes.h"
 
-#include "K2Node_EditablePinBase.h"
-#include "K2Node_Event.h"
-#include "K2Node_FunctionEntry.h"
-#include "K2Node_CustomEvent.h"
-#include "K2Node_FunctionResult.h"
-#include "K2Node_IfThenElse.h"
-#include "K2Node_MacroInstance.h"
-#include "K2Node_Switch.h"
-#include "K2Node_SwitchInteger.h"
-#include "K2Node_SwitchString.h"
-#include "K2Node_SwitchEnum.h"
-#include "K2Node_Select.h"
-#include "K2Node_ExecutionSequence.h"
-#include "K2Node_VariableGet.h"
-#include "K2Node_VariableSet.h"
-#include "K2Node_CallFunction.h"
-#include "K2Node_CallArrayFunction.h"
-#include "K2Node_MakeStruct.h"
-#include "K2Node_BreakStruct.h"
-#include "K2Node_EnumLiteral.h"
-#include "K2Node_Knot.h"
+#include "BlueprintGraphModule.h"
+#include "Modules/ModuleManager.h"
 
-
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetToolsModule.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphSchema.h"
-#include "EdGraphSchema_K2_Actions.h"
-
-#include "BlueprintActionDatabase.h"
-#include "BlueprintActionFilter.h"
-#include "BlueprintActionMenuBuilder.h"
-#include "BlueprintActionMenuItem.h"
-#include "BlueprintActionMenuUtils.h"
-#include "BlueprintEditor.h"
-#include "BlueprintFunctionNodeSpawner.h"
-
+#include "EdGraphSchema_K2.h"
+#include "Engine/Blueprint.h"
+#include "Engine/UserDefinedEnum.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
-#include "Engine/LevelScriptBlueprint.h"
-#include "Engine/UserDefinedEnum.h"
-
-#include "AssetToolsModule.h"
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "UserDefinedStructure/UserDefinedStructEditorData.h"
+#include "Kismet2/StructureEditorUtils.h"
 #include "UObject/SavePackage.h"
+#include "UserDefinedStructure/UserDefinedStructEditorData.h"
+
+#include "K2Node.h"
+#include "K2Node_BreakStruct.h"
+#include "K2Node_CallArrayFunction.h"
+#include "K2Node_CallFunction.h"
+#include "K2Node_CustomEvent.h"
+#include "K2Node_EnumLiteral.h"
+#include "K2Node_ExecutionSequence.h"
+#include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
+#include "K2Node_IfThenElse.h"
+#include "K2Node_Knot.h"
+#include "K2Node_MacroInstance.h"
+#include "GameplayTagsK2Node_SwitchGameplayTag.h"
+#include "K2Node_MakeArray.h"
+#include "K2Node_MakeStruct.h"
+#include "K2Node_Event.h"
+#include "K2Node_Select.h"
+#include "K2Node_SwitchEnum.h"
+#include "K2Node_SwitchInteger.h"
+#include "K2Node_SwitchName.h"
+#include "K2Node_SwitchString.h"
+#include "K2Node_VariableGet.h"
+#include "K2Node_VariableSet.h"
 
 
 
@@ -54,7 +50,101 @@
 
 namespace
 {
+	static void EnsureBlueprintNodeModulesLoaded()
+	{
+		FModuleManager::LoadModuleChecked<FBlueprintGraphModule>(TEXT("BlueprintGraph"));
+	}
+
+	static UBlueprint* LoadStandardMacrosBlueprint()
+	{
+		static TWeakObjectPtr<UBlueprint> CachedBlueprint;
+		if (CachedBlueprint.IsValid())
+		{
+			return CachedBlueprint.Get();
+		}
+
+		const TCHAR* StandardMacrosPath = TEXT("/Engine/EditorBlueprintResources/StandardMacros.StandardMacros");
+		if (UBlueprint* Loaded = LoadObject<UBlueprint>(nullptr, StandardMacrosPath))
+		{
+			CachedBlueprint = Loaded;
+			return Loaded;
+		}
+
+		UE_LOG(LogSOTS_BlueprintGen, Warning, TEXT("LoadStandardMacrosBlueprint: Failed to load '%s'."), StandardMacrosPath);
+		return nullptr;
+	}
+
 	static void ApplyExtraPinDefaults(UEdGraphNode* Node, const FSOTS_BPGenGraphNode& NodeSpec);
+	static void ApplySelectOptionDefaults(UK2Node_Select* SelectNode, const FSOTS_BPGenGraphNode& NodeSpec);
+	static FString GetPinDirectionText(EEdGraphPinDirection Direction);
+	static bool ResolveStructPath(const FSOTS_BPGenGraphNode& NodeSpec, FString& OutStructPath);
+
+	static UEdGraph* FindMacroGraphByName(UBlueprint* MacroBP, const FName MacroName)
+	{
+		if (!MacroBP)
+		{
+			return nullptr;
+		}
+
+		for (UEdGraph* Graph : MacroBP->MacroGraphs)
+		{
+			if (Graph && Graph->GetFName() == MacroName)
+			{
+				return Graph;
+			}
+		}
+
+		return nullptr;
+	}
+
+	static UEdGraphNode* SpawnStandardMacroNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec, const FName MacroName)
+	{
+		if (!Graph)
+		{
+			return nullptr;
+		}
+
+		UBlueprint* MacroBP = LoadStandardMacrosBlueprint();
+		UEdGraph* MacroGraph = FindMacroGraphByName(MacroBP, MacroName);
+		if (!MacroGraph)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnStandardMacroNode: Could not find macro '%s' in StandardMacros blueprint for node '%s'."),
+				*MacroName.ToString(), *NodeSpec.Id);
+			return nullptr;
+		}
+
+		Graph->Modify();
+
+		UK2Node_MacroInstance* Node = NewObject<UK2Node_MacroInstance>(Graph);
+		Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+		Node->SetFlags(RF_Transactional);
+		Node->CreateNewGuid();
+		Node->SetMacroGraph(MacroGraph);
+		Node->PostPlacedNewNode();
+		Node->AllocateDefaultPins();
+
+		UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnStandardMacroNode: Node '%s' (macro '%s') pins after creation:"), *NodeSpec.Id, *MacroName.ToString());
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin)
+			{
+				UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+					*Pin->PinName.ToString(),
+					*GetPinDirectionText(Pin->Direction),
+					*Pin->PinType.PinCategory.ToString(),
+					*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+					*Pin->DefaultValue);
+			}
+		}
+
+		Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+		Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+		ApplyExtraPinDefaults(Node, NodeSpec);
+
+		return Node;
+	}
 
 	static FString GetNormalizedPackageName(const FString& InAssetPath)
 	{
@@ -77,6 +167,36 @@ namespace
 		}
 
 		return FName(TEXT("SOTS_BPGenObject"));
+	}
+
+	static FString ResolvePinCategoryString(const FName& PinCategory)
+	{
+		return PinCategory.IsNone() ? FString() : PinCategory.ToString();
+	}
+
+	static FString GetPinDirectionText(EEdGraphPinDirection Direction)
+	{
+		if (const UEnum* Enum = StaticEnum<EEdGraphPinDirection>())
+		{
+			return Enum->GetNameStringByValue(static_cast<int64>(Direction));
+		}
+
+		return TEXT("Unknown");
+	}
+
+	static UScriptStruct* LoadStructFromPath(const FString& StructPath)
+	{
+		if (StructPath.IsEmpty())
+		{
+			return nullptr;
+		}
+
+		if (UScriptStruct* FoundStruct = FindObject<UScriptStruct>(nullptr, *StructPath))
+		{
+			return FoundStruct;
+		}
+
+		return LoadObject<UScriptStruct>(nullptr, *StructPath);
 	}
 
 	static bool FillPinTypeFromBPGen(const FSOTS_BPGenPin& InPin, FEdGraphPinType& OutType)
@@ -206,6 +326,114 @@ namespace
 		}
 	}
 
+	static ESOTS_BPGenContainerType ParseContainerType(const FString& Value)
+	{
+		if (Value.Equals(TEXT("Array"), ESearchCase::IgnoreCase))
+		{
+			return ESOTS_BPGenContainerType::Array;
+		}
+		if (Value.Equals(TEXT("Set"), ESearchCase::IgnoreCase))
+		{
+			return ESOTS_BPGenContainerType::Set;
+		}
+		if (Value.Equals(TEXT("Map"), ESearchCase::IgnoreCase))
+		{
+			return ESOTS_BPGenContainerType::Map;
+		}
+
+		return ESOTS_BPGenContainerType::None;
+	}
+
+	static FSOTS_BPGenPin BuildPinDefFromNodeSpec(const FSOTS_BPGenGraphNode& NodeSpec)
+	{
+		FSOTS_BPGenPin PinDef;
+		PinDef.Name = NodeSpec.VariableName;
+
+		if (const FString* Category = NodeSpec.ExtraData.Find(FName(TEXT("PinCategory"))))
+		{
+			PinDef.Category = FName(**Category);
+		}
+		if (const FString* SubCategory = NodeSpec.ExtraData.Find(FName(TEXT("PinSubCategory"))))
+		{
+			PinDef.SubCategory = FName(**SubCategory);
+		}
+		if (const FString* SubObjectPath = NodeSpec.ExtraData.Find(FName(TEXT("SubObjectPath"))))
+		{
+			PinDef.SubObjectPath = *SubObjectPath;
+		}
+		if (const FString* Container = NodeSpec.ExtraData.Find(FName(TEXT("ContainerType"))))
+		{
+			PinDef.ContainerType = ParseContainerType(*Container);
+		}
+		if (const FString* DefaultValue = NodeSpec.ExtraData.Find(FName(TEXT("DefaultValue"))))
+		{
+			PinDef.DefaultValue = *DefaultValue;
+		}
+
+		return PinDef;
+	}
+
+	static void EnsureBlueprintVariableFromNodeSpec(UBlueprint* Blueprint, const FSOTS_BPGenGraphNode& NodeSpec)
+	{
+		if (!Blueprint || NodeSpec.VariableName.IsNone())
+		{
+			return;
+		}
+
+		const bool bVariableExists = Blueprint && Blueprint->NewVariables.ContainsByPredicate(
+			[&](const FBPVariableDescription& Desc)
+			{
+				return Desc.VarName == NodeSpec.VariableName;
+			});
+
+		if (bVariableExists)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display,
+				TEXT("EnsureBlueprintVariableFromNodeSpec: Variable '%s' already exists on blueprint '%s'."),
+				*NodeSpec.VariableName.ToString(), *Blueprint->GetPathName());
+			return;
+		}
+
+		const FSOTS_BPGenPin PinDef = BuildPinDefFromNodeSpec(NodeSpec);
+		if (PinDef.Category.IsNone())
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("EnsureBlueprintVariableFromNodeSpec: Node '%s' does not specify a PinCategory."),
+				*NodeSpec.Id);
+			return;
+		}
+
+		FEdGraphPinType PinType;
+		if (!FillPinTypeFromBPGen(PinDef, PinType))
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("EnsureBlueprintVariableFromNodeSpec: Failed to build pin type for variable '%s'."),
+				*NodeSpec.VariableName.ToString());
+			return;
+		}
+
+		Blueprint->Modify();
+		UE_LOG(LogSOTS_BlueprintGen, Verbose,
+			TEXT("EnsureBlueprintVariableFromNodeSpec: Creating variable '%s' (Category=%s, Default='%s')."),
+			*NodeSpec.VariableName.ToString(),
+			*PinDef.Category.ToString(),
+			*PinDef.DefaultValue);
+
+		if (!FBlueprintEditorUtils::AddMemberVariable(Blueprint, NodeSpec.VariableName, PinType, PinDef.DefaultValue))
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("EnsureBlueprintVariableFromNodeSpec: Could not add variable '%s' to blueprint '%s'."),
+				*NodeSpec.VariableName.ToString(), *Blueprint->GetPathName());
+		}
+		else
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display,
+				TEXT("EnsureBlueprintVariableFromNodeSpec: Created variable '%s' (Category=%s, Default='%s') on blueprint '%s'."),
+				*NodeSpec.VariableName.ToString(), *ResolvePinCategoryString(PinDef.Category), *PinDef.DefaultValue,
+				*Blueprint->GetPathName());
+		}
+	}
+
 	static bool SaveBlueprint(UBlueprint* Blueprint)
 	{
 		if (!Blueprint)
@@ -267,6 +495,20 @@ namespace
 		CallNode->SetFromFunction(TargetFunction);
 		CallNode->AllocateDefaultPins();
 
+		UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnCallFunctionNode: Node '%s' function '%s' pins after creation:"), *NodeSpec.Id, *NodeSpec.FunctionPath);
+		for (UEdGraphPin* Pin : CallNode->Pins)
+		{
+			if (Pin)
+			{
+				UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+					*Pin->PinName.ToString(),
+					*GetPinDirectionText(Pin->Direction),
+					*Pin->PinType.PinCategory.ToString(),
+					*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+					*Pin->DefaultValue);
+			}
+		}
+
 		CallNode->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
 		CallNode->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
 
@@ -275,12 +517,79 @@ namespace
 		return CallNode;
 	}
 
-	static UEdGraphNode* SpawnVariableGetNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+	static UEdGraphNode* SpawnArrayFunctionNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
 	{
 		if (!Graph)
 		{
 			return nullptr;
 		}
+
+		if (NodeSpec.FunctionPath.IsEmpty())
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnArrayFunctionNode: Node '%s' missing FunctionPath."),
+				*NodeSpec.Id);
+			return nullptr;
+		}
+
+		UFunction* TargetFunction = FindObject<UFunction>(nullptr, *NodeSpec.FunctionPath);
+		if (!TargetFunction)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnArrayFunctionNode: Could not find function '%s' for node '%s'."),
+				*NodeSpec.FunctionPath, *NodeSpec.Id);
+			return nullptr;
+		}
+
+		Graph->Modify();
+
+		UK2Node_CallArrayFunction* ArrayNode = NewObject<UK2Node_CallArrayFunction>(Graph);
+		Graph->AddNode(ArrayNode, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+		ArrayNode->SetFlags(RF_Transactional);
+		ArrayNode->CreateNewGuid();
+		ArrayNode->PostPlacedNewNode();
+		ArrayNode->SetFromFunction(TargetFunction);
+		ArrayNode->AllocateDefaultPins();
+
+		ArrayNode->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+		ArrayNode->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+		ApplyExtraPinDefaults(ArrayNode, NodeSpec);
+
+		UE_LOG(LogSOTS_BlueprintGen, Display,
+			TEXT("SpawnArrayFunctionNode: Node '%s' pins after creation:"),
+			*NodeSpec.Id);
+
+		const UEnum* ContainerEnum = StaticEnum<EPinContainerType>();
+		for (UEdGraphPin* Pin : ArrayNode->Pins)
+		{
+			if (!Pin)
+			{
+				continue;
+			}
+
+			const FString CategoryText = ResolvePinCategoryString(Pin->PinType.PinCategory);
+			const FString DirectionText = GetPinDirectionText(Pin->Direction);
+			const FString ContainerText = ContainerEnum
+				? ContainerEnum->GetNameStringByValue(static_cast<int64>(Pin->PinType.ContainerType))
+				: TEXT("Unknown");
+
+			UE_LOG(LogSOTS_BlueprintGen, Display,
+				TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(), *DirectionText, *CategoryText, *ContainerText, *Pin->DefaultValue);
+		}
+
+		return ArrayNode;
+	}
+
+	static UEdGraphNode* SpawnVariableGetNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec, UBlueprint* Blueprint)
+	{
+		if (!Graph)
+		{
+			return nullptr;
+		}
+
+		EnsureBlueprintVariableFromNodeSpec(Blueprint, NodeSpec);
 
 		if (NodeSpec.VariableName.IsNone())
 		{
@@ -305,15 +614,31 @@ namespace
 
 		ApplyExtraPinDefaults(VarNode, NodeSpec);
 
+		UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnVariableGetNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+		for (UEdGraphPin* Pin : VarNode->Pins)
+		{
+			if (Pin)
+			{
+				UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+					*Pin->PinName.ToString(),
+					*GetPinDirectionText(Pin->Direction),
+					*Pin->PinType.PinCategory.ToString(),
+					*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+					*Pin->DefaultValue);
+			}
+		}
+
 		return VarNode;
 	}
 
-	static UEdGraphNode* SpawnVariableSetNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+	static UEdGraphNode* SpawnVariableSetNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec, UBlueprint* Blueprint)
 	{
 		if (!Graph)
 		{
 			return nullptr;
 		}
+
+		EnsureBlueprintVariableFromNodeSpec(Blueprint, NodeSpec);
 
 		if (NodeSpec.VariableName.IsNone())
 		{
@@ -396,14 +721,104 @@ namespace
 			return;
 		}
 
+		TMap<FString, FSOTS_BPGenPin> PinTypeOverrides;
+
 		for (const TPair<FName, FString>& ExtraPair : NodeSpec.ExtraData)
 		{
+			const FString KeyString = ExtraPair.Key.ToString();
+			FString PinName;
+			FString Attribute;
+			if (KeyString.Split(TEXT("."), &PinName, &Attribute))
+			{
+				FSOTS_BPGenPin& Override = PinTypeOverrides.FindOrAdd(PinName);
+				if (Attribute.Equals(TEXT("PinCategory"), ESearchCase::IgnoreCase))
+				{
+					Override.Category = FName(*ExtraPair.Value);
+				}
+				else if (Attribute.Equals(TEXT("PinSubCategory"), ESearchCase::IgnoreCase))
+				{
+					Override.SubCategory = FName(*ExtraPair.Value);
+				}
+				else if (Attribute.Equals(TEXT("SubObjectPath"), ESearchCase::IgnoreCase))
+				{
+					Override.SubObjectPath = ExtraPair.Value;
+				}
+				else if (Attribute.Equals(TEXT("ContainerType"), ESearchCase::IgnoreCase))
+				{
+					Override.ContainerType = ParseContainerType(ExtraPair.Value);
+				}
+				else if (Attribute.Equals(TEXT("DefaultValue"), ESearchCase::IgnoreCase))
+				{
+					Override.DefaultValue = ExtraPair.Value;
+				}
+				continue;
+			}
+
 			if (UEdGraphPin* Pin = FindPinByName(Node, ExtraPair.Key))
 			{
 				Pin->DefaultValue = ExtraPair.Value;
 			}
 		}
+
+		for (const TPair<FString, FSOTS_BPGenPin>& OverridePair : PinTypeOverrides)
+		{
+			if (UEdGraphPin* Pin = FindPinByName(Node, FName(*OverridePair.Key)))
+			{
+				FEdGraphPinType NewType;
+				if (FillPinTypeFromBPGen(OverridePair.Value, NewType))
+				{
+					Pin->PinType = NewType;
+				}
+
+				if (!OverridePair.Value.DefaultValue.IsEmpty())
+				{
+					Pin->DefaultValue = OverridePair.Value.DefaultValue;
+				}
+			}
+		}
 	}
+
+	static void ApplySelectOptionDefaults(UK2Node_Select* SelectNode, const FSOTS_BPGenGraphNode& NodeSpec)
+	{
+		if (!SelectNode)
+		{
+			return;
+		}
+
+		TArray<UEdGraphPin*> OptionPins;
+		SelectNode->GetOptionPins(OptionPins);
+
+		for (int32 Index = 0; Index < OptionPins.Num(); ++Index)
+		{
+			UEdGraphPin* OptionPin = OptionPins[Index];
+			if (!OptionPin)
+			{
+				continue;
+			}
+
+			const FString Key = FString::Printf(TEXT("Option %d.DefaultValue"), Index);
+			if (const FString* DefaultPtr = NodeSpec.ExtraData.Find(*Key))
+			{
+				OptionPin->DefaultValue = *DefaultPtr;
+			}
+		}
+
+		SelectNode->NodeConnectionListChanged();
+	}
+
+static bool ResolveStructPath(const FSOTS_BPGenGraphNode& NodeSpec, FString& OutStructPath)
+{
+	if (const FString* ExtraStructPath = NodeSpec.ExtraData.Find(FName(TEXT("StructPath"))))
+	{
+		OutStructPath = *ExtraStructPath;
+	}
+	else
+	{
+		OutStructPath = NodeSpec.StructPath;
+	}
+
+	return !OutStructPath.IsEmpty();
+}
 
 	static void ClearNonExecPins(UEdGraphNode* Node)
 	{
@@ -435,16 +850,6 @@ namespace
 			Pin->BreakAllPinLinks();
 			Node->RemovePin(Pin);
 		}
-	}
-
-	static FString GetPinDirectionText(EEdGraphPinDirection Direction)
-	{
-		if (const UEnum* Enum = StaticEnum<EEdGraphPinDirection>())
-		{
-			return Enum->GetNameStringByValue(static_cast<int64>(Direction));
-		}
-
-		return TEXT("Unknown");
 	}
 
 	static bool ValidateLinkPins(const FSOTS_BPGenGraphLink& Link, UEdGraphPin* FromPin, UEdGraphPin* ToPin, FSOTS_BPGenApplyResult& Result)
@@ -482,11 +887,6 @@ namespace
 		}
 
 		return bIsValid;
-	}
-
-	static FString ResolvePinCategoryString(const FName& PinCategory)
-	{
-		return PinCategory.IsNone() ? FString() : PinCategory.ToString();
 	}
 
 	static int32 AddPinsFromSpec(UEdGraphNode* Node, EEdGraphPinDirection Direction, const TArray<FSOTS_BPGenPin>& PinDefs, TArray<FString>& OutWarnings)
@@ -545,6 +945,842 @@ namespace
 	}
 }
 
+template <typename TNode>
+static UEdGraphNode* SpawnBasicNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	TNode* Node = NewObject<TNode>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnExecutionSequenceNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_ExecutionSequence* Node = NewObject<UK2Node_ExecutionSequence>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	int32 DesiredOutputs = 2;
+	if (const FString* NumOutputsStr = NodeSpec.ExtraData.Find(FName(TEXT("NumOutputs"))))
+	{
+		DesiredOutputs = FMath::Max(2, FCString::Atoi(**NumOutputsStr));
+	}
+
+	auto CountExecOutputs = [](UK2Node_ExecutionSequence* SeqNode)
+	{
+		int32 Count = 0;
+		for (UEdGraphPin* Pin : SeqNode->Pins)
+		{
+			if (Pin && Pin->Direction == EGPD_Output && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec)
+			{
+				++Count;
+			}
+		}
+		return Count;
+	};
+
+	int32 CurrentOutputs = CountExecOutputs(Node);
+	for (int32 Index = CurrentOutputs; Index < DesiredOutputs; ++Index)
+	{
+		const FName NewPinName(*FString::Printf(TEXT("Then_%d"), Index));
+		Node->CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Exec, NewPinName);
+	}
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnMakeArrayNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	int32 DesiredInputs = 0;
+	if (const FString* NumInputsStr = NodeSpec.ExtraData.Find(FName(TEXT("NumInputs"))))
+	{
+		DesiredInputs = FMath::Max(0, FCString::Atoi(**NumInputsStr));
+	}
+
+	DesiredInputs = FMath::Max(1, DesiredInputs);
+
+	UK2Node_MakeArray* Node = NewObject<UK2Node_MakeArray>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->NumInputs = DesiredInputs;
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	FSOTS_BPGenPin ElementPinSpec;
+	if (const FString* PinCategory = NodeSpec.ExtraData.Find(FName(TEXT("PinCategory"))))
+	{
+		ElementPinSpec.Category = FName(**PinCategory);
+	}
+	if (const FString* PinSubCategory = NodeSpec.ExtraData.Find(FName(TEXT("PinSubCategory"))))
+	{
+		ElementPinSpec.SubCategory = FName(**PinSubCategory);
+	}
+	if (const FString* SubObjectPath = NodeSpec.ExtraData.Find(FName(TEXT("SubObjectPath"))))
+	{
+		ElementPinSpec.SubObjectPath = *SubObjectPath;
+	}
+	if (const FString* ContainerType = NodeSpec.ExtraData.Find(FName(TEXT("ContainerType"))))
+	{
+		ElementPinSpec.ContainerType = ParseContainerType(*ContainerType);
+	}
+
+	FEdGraphPinType ElementType;
+	if (FillPinTypeFromBPGen(ElementPinSpec, ElementType))
+	{
+		FEdGraphPinType ArrayType = ElementType;
+		ArrayType.ContainerType = EPinContainerType::Array;
+
+		TMap<FString, FString> InputDefaults;
+		for (const TPair<FName, FString>& ExtraPair : NodeSpec.ExtraData)
+		{
+			const FString KeyString = ExtraPair.Key.ToString();
+			if (KeyString.StartsWith(TEXT("Input")))
+			{
+				InputDefaults.Add(KeyString.RightChop(5), ExtraPair.Value); // strip "Input"
+			}
+		}
+
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (!Pin)
+			{
+				continue;
+			}
+
+			if (Pin->Direction == EGPD_Output)
+			{
+				Pin->PinType = ArrayType;
+				continue;
+			}
+
+			Pin->PinType = ElementType;
+
+			const FString PinKey = Pin->PinName.ToString();
+			if (const FString* DefaultValue = InputDefaults.Find(PinKey))
+			{
+				Pin->DefaultValue = *DefaultValue;
+			}
+		}
+	}
+
+	// Apply defaults after all pins exist so inputs can be initialized from the spec.
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnMakeStructNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	FString StructPath;
+	if (!ResolveStructPath(NodeSpec, StructPath))
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnMakeStructNode: Node '%s' missing StructPath."),
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	UScriptStruct* StructType = LoadStructFromPath(StructPath);
+	if (!StructType)
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnMakeStructNode: Failed to resolve StructPath '%s' for node '%s'."),
+			*StructPath,
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_MakeStruct* Node = NewObject<UK2Node_MakeStruct>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->StructType = StructType;
+	Node->CreateNewGuid();
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+	Node->ReconstructNode();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnBreakStructNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	FString StructPath;
+	if (!ResolveStructPath(NodeSpec, StructPath))
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnBreakStructNode: Node '%s' missing StructPath."),
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	UScriptStruct* StructType = LoadStructFromPath(StructPath);
+	if (!StructType)
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnBreakStructNode: Failed to resolve StructPath '%s' for node '%s'."),
+			*StructPath,
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_BreakStruct* Node = NewObject<UK2Node_BreakStruct>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->StructType = StructType;
+	Node->CreateNewGuid();
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+	Node->ReconstructNode();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnEventNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec, UBlueprint* Blueprint)
+{
+	if (!Graph || !Blueprint)
+	{
+		return nullptr;
+	}
+
+	const FString* EventNameStr = NodeSpec.ExtraData.Find(FName(TEXT("EventName")));
+	if (!EventNameStr || EventNameStr->IsEmpty())
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnEventNode: Node '%s' missing EventName in ExtraData."),
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	const FName EventName(**EventNameStr);
+
+	UBlueprintGeneratedClass* SkeletonClass = Cast<UBlueprintGeneratedClass>(Blueprint->SkeletonGeneratedClass.Get());
+	if (!SkeletonClass)
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnEventNode: Blueprint '%s' has no valid SkeletonGeneratedClass."),
+			*Blueprint->GetPathName());
+		return nullptr;
+	}
+
+	UFunction* EventFunction = SkeletonClass->FindFunctionByName(EventName);
+	if (!EventFunction)
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnEventNode: Could not find event function '%s' on skeleton class '%s'."),
+			*EventName.ToString(),
+			*SkeletonClass->GetName());
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_Event* Node = NewObject<UK2Node_Event>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->EventReference.SetFromField<UFunction>(EventFunction, /*bSelfContext=*/false);
+	Node->bOverrideFunction = true;
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnCustomEventNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	const FString* EventNameStr = NodeSpec.ExtraData.Find(FName(TEXT("EventName")));
+	if (!EventNameStr || EventNameStr->IsEmpty())
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnCustomEventNode: Node '%s' missing EventName in ExtraData."),
+			*NodeSpec.Id);
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_CustomEvent* Node = NewObject<UK2Node_CustomEvent>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->CustomFunctionName = FName(**EventNameStr);
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSelectNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_Select* Node = NewObject<UK2Node_Select>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+
+	bool bApplyStructType = false;
+	FEdGraphPinType DesiredStructPinType;
+
+	// If a TypePath is provided, try to set the select type before pin allocation so pins get the right schema.
+	if (const FString* TypePath = NodeSpec.ExtraData.Find(FName(TEXT("TypePath"))))
+	{
+		// Prefer structs first (common case), then enums. This avoids noisy log warnings when the path is a struct.
+		if (UScriptStruct* StructType = LoadStructFromPath(*TypePath))
+		{
+			DesiredStructPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+			DesiredStructPinType.PinSubCategoryObject = StructType;
+			DesiredStructPinType.ContainerType = EPinContainerType::None;
+			bApplyStructType = true;
+		}
+		else if (UEnum* EnumType = LoadObject<UEnum>(nullptr, **TypePath))
+		{
+			Node->SetEnum(EnumType);
+		}
+		else
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnSelectNode: Failed to resolve TypePath '%s' for node '%s'."),
+				**TypePath, *NodeSpec.Id);
+		}
+		// If neither enum nor struct, fall back to wildcard and let ExtraData pin overrides shape the type.
+	}
+
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	int32 DesiredOptionPins = 0;
+	if (const FString* NumOptionsStr = NodeSpec.ExtraData.Find(FName(TEXT("NumOptionPins"))))
+	{
+		DesiredOptionPins = FMath::Max(0, FCString::Atoi(**NumOptionsStr));
+	}
+
+	if (DesiredOptionPins > 0)
+	{
+		TArray<UEdGraphPin*> OptionPins;
+		Node->GetOptionPins(OptionPins);
+
+		while (OptionPins.Num() < DesiredOptionPins)
+		{
+			Node->AddInputPin();
+			OptionPins.Reset();
+			Node->GetOptionPins(OptionPins);
+		}
+	}
+
+	// Apply index type + default so it does not remain wildcard.
+	if (UEdGraphPin* IndexPin = Node->GetIndexPin())
+	{
+		IndexPin->PinType.PinCategory = UEdGraphSchema_K2::PC_Int;
+		IndexPin->PinType.PinSubCategory = NAME_None;
+		IndexPin->PinType.PinSubCategoryObject = nullptr;
+		const FString IndexDefault = NodeSpec.ExtraData.FindRef(FName(TEXT("IndexDefault")));
+		IndexPin->DefaultValue = IndexDefault.IsEmpty() ? TEXT("0") : IndexDefault;
+		Node->PinTypeChanged(IndexPin);
+	}
+
+	if (bApplyStructType)
+	{
+		TArray<UEdGraphPin*> OptionPins;
+		Node->GetOptionPins(OptionPins);
+		for (UEdGraphPin* OptionPin : OptionPins)
+		{
+			if (OptionPin)
+			{
+				OptionPin->PinType = DesiredStructPinType;
+				Node->PinTypeChanged(OptionPin);
+			}
+		}
+
+		if (UEdGraphPin* ResultPin = Node->GetReturnValuePin())
+		{
+			ResultPin->PinType = DesiredStructPinType;
+			Node->PinTypeChanged(ResultPin);
+		}
+
+		if (UEdGraphPin* DefaultPin = Node->FindPin(FName(TEXT("Default"))))
+		{
+			DefaultPin->PinType = DesiredStructPinType;
+			Node->PinTypeChanged(DefaultPin);
+		}
+	}
+
+	ApplySelectOptionDefaults(Node, NodeSpec);
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UK2Node* SpawnNodeByClassPath(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec, const TCHAR* ClassPath)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	UClass* NodeClass = LoadObject<UClass>(nullptr, ClassPath);
+	if (!NodeClass)
+	{
+		UE_LOG(LogSOTS_BlueprintGen, Warning,
+			TEXT("SpawnNodeByClassPath: Could not load class '%s' for node '%s'."),
+			ClassPath, *NodeSpec.Id);
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node* Node = NewObject<UK2Node>(Graph, NodeClass);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnForLoopWithBreakNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("ForLoopWithBreak")));
+}
+
+static UEdGraphNode* SpawnForEachLoopWithBreakNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("ForEachLoopWithBreak")));
+}
+
+static UEdGraphNode* SpawnForEachLoopNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("ForEachLoop")));
+}
+
+static UEdGraphNode* SpawnDoOnceNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("DoOnce")));
+}
+
+static UEdGraphNode* SpawnGateNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("Gate")));
+}
+
+static UEdGraphNode* SpawnFlipFlopNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	return SpawnStandardMacroNode(Graph, NodeSpec, FName(TEXT("FlipFlop")));
+}
+
+static UEdGraphNode* SpawnEnumLiteralNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_EnumLiteral* Node = NewObject<UK2Node_EnumLiteral>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+
+	if (const FString* EnumPath = NodeSpec.ExtraData.Find(FName(TEXT("EnumPath"))))
+	{
+		if (UEnum* EnumAsset = LoadObject<UEnum>(nullptr, **EnumPath))
+		{
+			Node->Enum = EnumAsset;
+		}
+		else
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnEnumLiteralNode: Could not load enum '%s' for node '%s'."),
+				**EnumPath, *NodeSpec.Id);
+		}
+	}
+
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+	Node->ReconstructNode();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	if (const FString* EnumValue = NodeSpec.ExtraData.Find(FName(TEXT("EnumValue"))))
+	{
+		if (UEdGraphPin* ReturnPin = FindPinByName(Node, FName(TEXT("ReturnValue"))))
+		{
+			ReturnPin->DefaultValue = *EnumValue;
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSwitchIntegerNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	UK2Node_SwitchInteger* Node = Cast<UK2Node_SwitchInteger>(SpawnBasicNode<UK2Node_SwitchInteger>(Graph, NodeSpec));
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	int32 CaseCount = 0;
+	if (const FString* CaseCountStr = NodeSpec.ExtraData.Find(FName(TEXT("CaseCount"))))
+	{
+		CaseCount = FCString::Atoi(**CaseCountStr);
+	}
+
+	for (int32 Index = 0; Index < CaseCount; ++Index)
+	{
+		Node->AddPinToSwitchNode();
+	}
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnSwitchIntegerNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSwitchStringNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	UK2Node_SwitchString* Node = Cast<UK2Node_SwitchString>(SpawnBasicNode<UK2Node_SwitchString>(Graph, NodeSpec));
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	int32 CaseCount = 0;
+	if (const FString* CaseCountStr = NodeSpec.ExtraData.Find(FName(TEXT("CaseCount"))))
+	{
+		CaseCount = FCString::Atoi(**CaseCountStr);
+	}
+
+	for (int32 Index = 0; Index < CaseCount; ++Index)
+	{
+		Node->AddPinToSwitchNode();
+	}
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnSwitchStringNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnNameLiteralNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	// Map name literal to the existing KismetSystemLibrary helper to avoid a dedicated node class.
+	FSOTS_BPGenGraphNode CallSpec = NodeSpec;
+	CallSpec.FunctionPath = TEXT("/Script/Engine.KismetSystemLibrary:MakeLiteralName");
+
+	UEdGraphNode* Node = SpawnCallFunctionNode(Graph, CallSpec);
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	if (const FString* LiteralValue = NodeSpec.ExtraData.Find(FName(TEXT("Value"))))
+	{
+		if (UEdGraphPin* ValuePin = FindPinByName(Node, FName(TEXT("Value"))))
+		{
+			ValuePin->DefaultValue = *LiteralValue;
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSwitchNameNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	UK2Node_SwitchName* Node = Cast<UK2Node_SwitchName>(SpawnBasicNode<UK2Node_SwitchName>(Graph, NodeSpec));
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	int32 CaseCount = 0;
+	if (const FString* CaseCountStr = NodeSpec.ExtraData.Find(FName(TEXT("CaseCount"))))
+	{
+		CaseCount = FCString::Atoi(**CaseCountStr);
+	}
+
+	for (int32 Index = 0; Index < CaseCount; ++Index)
+	{
+		Node->AddPinToSwitchNode();
+	}
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnSwitchNameNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnMakeLiteralGameplayTagNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	// Avoid deprecated gameplay tag literal node; call the kismet helper function instead.
+	FSOTS_BPGenGraphNode CallSpec = NodeSpec;
+	// BlueprintGameplayTagLibrary hosts the literal helpers in UE5.7; use that path so FindObject succeeds.
+	CallSpec.FunctionPath = TEXT("/Script/GameplayTags.BlueprintGameplayTagLibrary:MakeLiteralGameplayTag");
+
+	UEdGraphNode* Node = SpawnCallFunctionNode(Graph, CallSpec);
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	if (const FString* TagValue = NodeSpec.ExtraData.Find(FName(TEXT("Tag"))))
+	{
+		if (UEdGraphPin* TagPin = FindPinByName(Node, FName(TEXT("Value"))))
+		{
+			// FGameplayTag ImportText expects a struct-style literal like (TagName="GameplayCue.Default").
+			if (!TagValue->IsEmpty())
+			{
+				TagPin->DefaultValue = FString::Printf(TEXT("(TagName=\"%s\")"), **TagValue);
+			}
+			else
+			{
+				TagPin->DefaultValue.Reset();
+			}
+		}
+	}
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnMakeLiteralGameplayTagNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSwitchGameplayTagNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	UGameplayTagsK2Node_SwitchGameplayTag* Node = Cast<UGameplayTagsK2Node_SwitchGameplayTag>(SpawnBasicNode<UGameplayTagsK2Node_SwitchGameplayTag>(Graph, NodeSpec));
+	if (!Node)
+	{
+		return nullptr;
+	}
+
+	int32 CaseCount = 0;
+	if (const FString* CaseCountStr = NodeSpec.ExtraData.Find(FName(TEXT("CaseCount"))))
+	{
+		CaseCount = FCString::Atoi(**CaseCountStr);
+	}
+
+	for (int32 Index = 0; Index < CaseCount; ++Index)
+	{
+		Node->AddPinToSwitchNode();
+	}
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnSwitchGameplayTagNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
+static UEdGraphNode* SpawnSwitchEnumNode(UEdGraph* Graph, const FSOTS_BPGenGraphNode& NodeSpec)
+{
+	if (!Graph)
+	{
+		return nullptr;
+	}
+
+	Graph->Modify();
+
+	UK2Node_SwitchEnum* Node = NewObject<UK2Node_SwitchEnum>(Graph);
+	Graph->AddNode(Node, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	Node->SetFlags(RF_Transactional);
+	Node->CreateNewGuid();
+
+	if (const FString* EnumPath = NodeSpec.ExtraData.Find(FName(TEXT("EnumPath"))))
+	{
+		if (UEnum* EnumAsset = LoadObject<UEnum>(nullptr, **EnumPath))
+		{
+			Node->SetEnum(EnumAsset);
+		}
+		else
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SpawnSwitchEnumNode: Could not load enum '%s' for node '%s'."),
+				**EnumPath, *NodeSpec.Id);
+		}
+	}
+
+	Node->PostPlacedNewNode();
+	Node->AllocateDefaultPins();
+	Node->ReconstructNode();
+
+	Node->NodePosX = static_cast<int32>(NodeSpec.NodePosition.X);
+	Node->NodePosY = static_cast<int32>(NodeSpec.NodePosition.Y);
+
+	ApplyExtraPinDefaults(Node, NodeSpec);
+
+	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SpawnSwitchEnumNode: Node '%s' pins after creation:"), *NodeSpec.Id);
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("  Pin '%s' Dir=%s Cat=%s Container=%s Default='%s'"),
+				*Pin->PinName.ToString(),
+				*GetPinDirectionText(Pin->Direction),
+				*Pin->PinType.PinCategory.ToString(),
+				*UEnum::GetValueAsString(Pin->PinType.ContainerType),
+				*Pin->DefaultValue);
+		}
+	}
+
+	return Node;
+}
+
 FSOTS_BPGenAssetResult USOTS_BPGenBuilder::CreateStructAssetFromDef(
 	const UObject* WorldContextObject,
 	const FSOTS_BPGenStructDef& StructDef)
@@ -571,6 +1807,9 @@ FSOTS_BPGenAssetResult USOTS_BPGenBuilder::CreateStructAssetFromDef(
 		UE_LOG(LogSOTS_BlueprintGen, Error, TEXT("%s"), *Result.Message);
 		return Result;
 	}
+
+	// Ensure the package is fully loaded before we start mutating it so SavePackage won't fail with partial load errors.
+	Package->FullyLoad();
 
 	UUserDefinedStruct* TargetStruct = FindObject<UUserDefinedStruct>(Package, *StructName.ToString());
 	if (!TargetStruct)
@@ -670,6 +1909,9 @@ FSOTS_BPGenAssetResult USOTS_BPGenBuilder::CreateEnumAssetFromDef(
 		return Result;
 	}
 
+	// Ensure the package is fully loaded so updates to existing enums operate on a complete asset state.
+	Package->FullyLoad();
+
 	UUserDefinedEnum* TargetEnum = FindObject<UUserDefinedEnum>(Package, *EnumName.ToString());
 	if (!TargetEnum)
 	{
@@ -702,7 +1944,7 @@ FSOTS_BPGenAssetResult USOTS_BPGenBuilder::CreateEnumAssetFromDef(
 		EnumNames.Add(TPair<FName, int64>(EntryName, Index));
 	}
 
-	TargetEnum->SetEnums(EnumNames, UUserDefinedEnum::ECppForm::Regular);
+	TargetEnum->UEnum::SetEnums(EnumNames, UUserDefinedEnum::ECppForm::Namespaced);
 	TargetEnum->MarkPackageDirty();
 
 	FAssetRegistryModule::AssetCreated(TargetEnum);
@@ -839,6 +2081,39 @@ FSOTS_BPGenApplyResult USOTS_BPGenBuilder::ApplyFunctionSkeleton(
 		}
 	}
 
+	// Remove any remaining nodes before shaping the entry/result pins so the
+	// compiler triggered later doesn't try to recreate stale variable pins.
+	{
+		TArray<UEdGraphNode*> NodesToRemove;
+		for (UEdGraphNode* Node : FunctionGraph->Nodes)
+		{
+			if (!Node)
+			{
+				continue;
+			}
+
+			if (Node == EntryNode)
+			{
+				continue;
+			}
+
+			if (UK2Node_FunctionResult* ResultNode = Cast<UK2Node_FunctionResult>(Node))
+			{
+				if (ResultNodes.Contains(ResultNode))
+				{
+					continue;
+				}
+			}
+
+			NodesToRemove.Add(Node);
+		}
+
+		for (UEdGraphNode* NodeToRemove : NodesToRemove)
+		{
+			FunctionGraph->RemoveNode(NodeToRemove);
+		}
+	}
+
 	if (ResultNodes.Num() == 0)
 	{
 		Result.bSuccess = false;
@@ -936,6 +2211,9 @@ FSOTS_BPGenApplyResult USOTS_BPGenBuilder::ApplyGraphSpecToFunction(
 		UE_LOG(LogSOTS_BlueprintGen, Error, TEXT("%s"), *Result.ErrorMessage);
 		return Result;
 	}
+
+	// Ensure editor-only node modules are loaded so LoadObject lookups succeed when spawning nodes by class path.
+	EnsureBlueprintNodeModulesLoaded();
 
 	// Identify existing entry/result nodes before clearing anything.
 	UK2Node_FunctionEntry* EntryNode = nullptr;
@@ -1062,13 +2340,41 @@ FSOTS_BPGenApplyResult USOTS_BPGenBuilder::ApplyGraphSpecToFunction(
 		{
 			NewNode = SpawnCallFunctionNode(FunctionGraph, NodeSpec);
 		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_CallArrayFunction")))
+		{
+			NewNode = SpawnArrayFunctionNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_MakeArray")))
+		{
+			NewNode = SpawnMakeArrayNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_MakeStruct")))
+		{
+			NewNode = SpawnMakeStructNode(FunctionGraph, NodeSpec);
+			if (!NewNode)
+			{
+				Result.Warnings.Add(FString::Printf(
+					TEXT("Failed to spawn K2Node_MakeStruct for node '%s'."),
+					*NodeSpec.Id));
+			}
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_BreakStruct")))
+		{
+			NewNode = SpawnBreakStructNode(FunctionGraph, NodeSpec);
+			if (!NewNode)
+			{
+				Result.Warnings.Add(FString::Printf(
+					TEXT("Failed to spawn K2Node_BreakStruct for node '%s'."),
+					*NodeSpec.Id));
+			}
+		}
 		else if (NodeSpec.NodeType == FName(TEXT("K2Node_VariableGet")))
 		{
-			NewNode = SpawnVariableGetNode(FunctionGraph, NodeSpec);
+			NewNode = SpawnVariableGetNode(FunctionGraph, NodeSpec, Blueprint);
 		}
 		else if (NodeSpec.NodeType == FName(TEXT("K2Node_VariableSet")))
 		{
-			NewNode = SpawnVariableSetNode(FunctionGraph, NodeSpec);
+			NewNode = SpawnVariableSetNode(FunctionGraph, NodeSpec, Blueprint);
 		}
 		else if (NodeSpec.NodeType == FName(TEXT("K2Node_Branch"))
 			|| NodeSpec.NodeType == FName(TEXT("K2Node_IfThenElse")))
@@ -1078,6 +2384,98 @@ FSOTS_BPGenApplyResult USOTS_BPGenBuilder::ApplyGraphSpecToFunction(
 		else if (NodeSpec.NodeType == FName(TEXT("K2Node_Knot")))
 		{
 			NewNode = SpawnKnotNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_ExecutionSequence")))
+		{
+			NewNode = SpawnExecutionSequenceNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_ForLoopWithBreak")))
+		{
+			NewNode = SpawnForLoopWithBreakNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_ForEachLoopWithBreak")))
+		{
+			NewNode = SpawnForEachLoopWithBreakNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_ForEachLoop")))
+		{
+			NewNode = SpawnForEachLoopNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_DoOnce")))
+		{
+			NewNode = SpawnDoOnceNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_Gate")))
+		{
+			NewNode = SpawnGateNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_FlipFlop")))
+		{
+			NewNode = SpawnFlipFlopNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_EnumLiteral")))
+		{
+			NewNode = SpawnEnumLiteralNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_SwitchEnum")))
+		{
+			NewNode = SpawnSwitchEnumNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_SwitchInteger")))
+		{
+			NewNode = SpawnSwitchIntegerNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_SwitchString")))
+		{
+			NewNode = SpawnSwitchStringNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_NameLiteral")))
+		{
+			NewNode = SpawnNameLiteralNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_SwitchName")))
+		{
+			NewNode = SpawnSwitchNameNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_MakeLiteralGameplayTag"))
+			|| NodeSpec.NodeType == FName(TEXT("GameplayTagsK2Node_LiteralGameplayTag")))
+		{
+			NewNode = SpawnMakeLiteralGameplayTagNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_SwitchGameplayTag"))
+			|| NodeSpec.NodeType == FName(TEXT("GameplayTagsK2Node_SwitchGameplayTag")))
+		{
+			NewNode = SpawnSwitchGameplayTagNode(FunctionGraph, NodeSpec);
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_Select")))
+		{
+			NewNode = SpawnSelectNode(FunctionGraph, NodeSpec);
+			if (!NewNode)
+			{
+				Result.Warnings.Add(FString::Printf(
+					TEXT("Failed to spawn K2Node_Select for node '%s'."),
+					*NodeSpec.Id));
+			}
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_Event")))
+		{
+			NewNode = SpawnEventNode(FunctionGraph, NodeSpec, Blueprint);
+			if (!NewNode)
+			{
+				Result.Warnings.Add(FString::Printf(
+					TEXT("Failed to spawn K2Node_Event for node '%s'."),
+					*NodeSpec.Id));
+			}
+		}
+		else if (NodeSpec.NodeType == FName(TEXT("K2Node_CustomEvent")))
+		{
+			NewNode = SpawnCustomEventNode(FunctionGraph, NodeSpec);
+			if (!NewNode)
+			{
+				Result.Warnings.Add(FString::Printf(
+					TEXT("Failed to spawn K2Node_CustomEvent for node '%s'."),
+					*NodeSpec.Id));
+			}
 		}
 		else
 		{
@@ -1176,4 +2574,115 @@ FSOTS_BPGenApplyResult USOTS_BPGenBuilder::ApplyGraphSpecToFunction(
 
 	Result.bSuccess = true;
 	return Result;
+}
+
+FSOTS_BPGenApplyResult USOTS_BPGenBuilder::BuildTestAllNodesGraphForBPPrintHello()
+{
+	static const TCHAR* TestBlueprintPath = TEXT("/Game/DevTools/BP_PrintHello.BP_PrintHello");
+	static const FName TestFunctionName(TEXT("Test_AllNodesGraph"));
+
+	FSOTS_BPGenFunctionDef FunctionDef;
+	FunctionDef.TargetBlueprintPath = TestBlueprintPath;
+	FunctionDef.FunctionName = TestFunctionName;
+
+	FSOTS_BPGenGraphSpec GraphSpec;
+	GraphSpec.Nodes.Reserve(16);
+	GraphSpec.Links.Reserve(12);
+
+	auto AddNode = [&GraphSpec](
+		const FString& Id,
+		const TCHAR* NodeType,
+		const FVector2D& Position) -> FSOTS_BPGenGraphNode&
+	{
+		FSOTS_BPGenGraphNode& Node = GraphSpec.Nodes.AddDefaulted_GetRef();
+		Node.Id = Id;
+		Node.NodeType = FName(NodeType);
+		Node.NodePosition = Position;
+		return Node;
+	};
+
+	AddNode(TEXT("Entry"), TEXT("K2Node_FunctionEntry"), FVector2D(-500.f, -100.f));
+	AddNode(TEXT("Result"), TEXT("K2Node_FunctionResult"), FVector2D(800.f, 0.f));
+
+	AddNode(TEXT("Branch"), TEXT("K2Node_IfThenElse"), FVector2D(-150.f, -50.f));
+
+	FSOTS_BPGenGraphNode& PrintStringNode =
+		AddNode(TEXT("PrintString"), TEXT("K2Node_CallFunction"), FVector2D(150.f, -50.f));
+	PrintStringNode.FunctionPath = TEXT("/Script/Engine.KismetSystemLibrary:PrintString");
+	PrintStringNode.ExtraData.Add(TEXT("InString"), TEXT("BPGen AllNodes Test"));
+
+	AddNode(TEXT("TestInt_Get"), TEXT("K2Node_VariableGet"), FVector2D(-500.f, 50.f)).VariableName = TEXT("TestInt");
+
+	FSOTS_BPGenGraphNode& TestIntSetNode =
+		AddNode(TEXT("TestInt_Set"), TEXT("K2Node_VariableSet"), FVector2D(350.f, 150.f));
+	TestIntSetNode.VariableName = TEXT("TestInt");
+
+	FSOTS_BPGenGraphNode& TestBoolGetNode =
+		AddNode(TEXT("TestBool_Get"), TEXT("K2Node_VariableGet"), FVector2D(-500.f, -200.f));
+	TestBoolGetNode.VariableName = TEXT("bTestBool");
+
+	FSOTS_BPGenGraphNode& TestBoolSetNode =
+		AddNode(TEXT("TestBool_Set"), TEXT("K2Node_VariableSet"), FVector2D(450.f, -50.f));
+	TestBoolSetNode.VariableName = TEXT("bTestBool");
+	TestBoolSetNode.ExtraData.Add(TEXT("bTestBool"), TEXT("true"));
+
+	FSOTS_BPGenGraphNode& TestStringGetNode =
+		AddNode(TEXT("TestString_Get"), TEXT("K2Node_VariableGet"), FVector2D(-500.f, 125.f));
+	TestStringGetNode.VariableName = TEXT("TestString");
+
+	FSOTS_BPGenGraphNode& StringArrayGetNode =
+		AddNode(TEXT("TestStringArray_Get"), TEXT("K2Node_VariableGet"), FVector2D(-200.f, 200.f));
+	StringArrayGetNode.VariableName = TEXT("TestStringArray");
+	StringArrayGetNode.ExtraData.Add(TEXT("PinCategory"), TEXT("string"));
+	StringArrayGetNode.ExtraData.Add(TEXT("ContainerType"), TEXT("Array"));
+
+	FSOTS_BPGenGraphNode& StringArraySetNode =
+		AddNode(TEXT("TestStringArray_Set"), TEXT("K2Node_VariableSet"), FVector2D(150.f, 325.f));
+	StringArraySetNode.VariableName = TEXT("TestStringArray");
+	StringArraySetNode.ExtraData.Add(TEXT("PinCategory"), TEXT("string"));
+	StringArraySetNode.ExtraData.Add(TEXT("ContainerType"), TEXT("Array"));
+
+	FSOTS_BPGenGraphNode& ArrayLengthNode =
+		AddNode(TEXT("ArrayLength"), TEXT("K2Node_CallArrayFunction"), FVector2D(100.f, 200.f));
+	ArrayLengthNode.FunctionPath = TEXT("/Script/Engine.KismetArrayLibrary:Array_Length");
+
+	AddNode(TEXT("KnotNode"), TEXT("K2Node_Knot"), FVector2D(-300.f, -200.f));
+
+	auto AddLink = [&GraphSpec](
+		const FString& FromNode,
+		const FName& FromPin,
+		const FString& ToNode,
+		const FName& ToPin)
+	{
+		FSOTS_BPGenGraphLink& Link = GraphSpec.Links.AddDefaulted_GetRef();
+		Link.FromNodeId = FromNode;
+		Link.FromPinName = FromPin;
+		Link.ToNodeId = ToNode;
+		Link.ToPinName = ToPin;
+	};
+
+	AddLink(TEXT("Entry"), UEdGraphSchema_K2::PN_Then, TEXT("Branch"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("Branch"), UEdGraphSchema_K2::PN_Then, TEXT("PrintString"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("PrintString"), UEdGraphSchema_K2::PN_Then, TEXT("TestStringArray_Set"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("TestStringArray_Set"), UEdGraphSchema_K2::PN_Then, TEXT("TestBool_Set"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("TestBool_Set"), UEdGraphSchema_K2::PN_Then, TEXT("Result"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("Branch"), UEdGraphSchema_K2::PN_Else, TEXT("TestInt_Set"), UEdGraphSchema_K2::PN_Execute);
+	AddLink(TEXT("TestInt_Set"), UEdGraphSchema_K2::PN_Then, TEXT("Result"), UEdGraphSchema_K2::PN_Execute);
+
+	AddLink(TEXT("TestBool_Get"), TEXT("bTestBool"), TEXT("KnotNode"), TEXT("InputPin"));
+	AddLink(TEXT("KnotNode"), TEXT("OutputPin"), TEXT("Branch"), TEXT("Condition"));
+	AddLink(TEXT("TestString_Get"), TEXT("TestString"), TEXT("PrintString"), TEXT("InString"));
+	AddLink(TEXT("TestStringArray_Get"), TEXT("TestStringArray"), TEXT("TestStringArray_Set"), TEXT("TestStringArray"));
+	AddLink(TEXT("TestStringArray_Set"), TEXT("TestStringArray"), TEXT("ArrayLength"), TEXT("TargetArray"));
+	AddLink(TEXT("ArrayLength"), TEXT("ReturnValue"), TEXT("TestInt_Set"), TEXT("TestInt"));
+
+	FSOTS_BPGenApplyResult SkeletonResult = ApplyFunctionSkeleton(nullptr, FunctionDef);
+	if (!SkeletonResult.bSuccess)
+	{
+		return SkeletonResult;
+	}
+
+	FSOTS_BPGenApplyResult GraphResult = ApplyGraphSpecToFunction(nullptr, FunctionDef, GraphSpec);
+	GraphResult.Warnings.Append(SkeletonResult.Warnings);
+	return GraphResult;
 }

@@ -3,13 +3,14 @@
 #include "SOTS_BlueprintGen.h"
 #include "SOTS_BPGenBuilder.h"
 
-#include "Misc/CommandLine.h"
-#include "Misc/Paths.h"
-#include "Misc/FileHelper.h"
-#include "Dom/JsonObject.h"
-#include "Serialization/JsonSerializer.h"
-#include "JsonObjectConverter.h"
 #include "Containers/StringView.h"
+#include "Dom/JsonObject.h"
+#include "JsonObjectConverter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonSerializer.h"
 
 /**
  * Helper: Load a JSON file into a root object.
@@ -98,6 +99,30 @@ USOTS_BPGenBuildCommandlet::USOTS_BPGenBuildCommandlet()
 int32 USOTS_BPGenBuildCommandlet::Main(const FString& Params)
 {
 	UE_LOG(LogSOTS_BlueprintGen, Display, TEXT("SOTS_BPGenBuildCommandlet starting. Params: %s"), *Params);
+
+	if (FParse::Param(*Params, TEXT("TestAllNodesBPPrintHello")))
+	{
+		const FSOTS_BPGenApplyResult TestResult =
+			USOTS_BPGenBuilder::BuildTestAllNodesGraphForBPPrintHello();
+
+		for (const FString& Warning : TestResult.Warnings)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Warning,
+				TEXT("SOTS_BPGen: %s"), *Warning);
+		}
+
+		if (!TestResult.bSuccess)
+		{
+			UE_LOG(LogSOTS_BlueprintGen, Error,
+				TEXT("SOTS_BPGen: BuildTestAllNodesGraphForBPPrintHello failed: %s"),
+				*TestResult.ErrorMessage);
+			return 1;
+		}
+
+		UE_LOG(LogSOTS_BlueprintGen, Display,
+			TEXT("SOTS_BPGen: Built Test_AllNodesGraph on BP_PrintHello."));
+		return 0;
+	}
 
 	FString JobFilePath;
 	FString GraphSpecFilePath;

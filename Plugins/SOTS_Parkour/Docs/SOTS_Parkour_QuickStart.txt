@@ -1,0 +1,283 @@
+SOTS_Parkour – QuickStart (SPINE/BRIDGE/TOOLS Snapshot)
+=======================================================
+
+Plugin: SOTS_Parkour
+Engine: UE 5.7 (SOTS fork)
+Scope: Minimal, data-driven ledge detection + warp-style execution with a clean bridge + debug helpers.
+Status: SPINE 6, BRIDGE 3, TOOLS 2 complete. No OmniTrace integration yet.
+
+----------------------------------------------------------------------
+1. What’s in this plugin right now?
+----------------------------------------------------------------------
+
+Runtime types
+-------------
+
+1) USOTS_ParkourComponent (ActorComponent)
+   - High-level parkour state machine for an owning ACharacter.
+   - Entry point:
+       * void RequestParkour()
+         - From Idle only.
+         - Runs a simple, local-only forward trace.
+         - Classifies into:
+             - ESOTS_ParkourAction::Mantle (braced)
+             - ESOTS_ParkourAction::Drop (free-hang style)
+           based on ledge height vs. character feet.
+         - Saves result into FSOTS_ParkourResult LastResult.
+         - Performs a simple warp:
+             - Mantle: onto/over the ledge using config-driven offsets.
+             - Drop: straight down by a config-driven amount.
+         - Ends back in Idle state.
+       * void CancelParkour()
+         - Resets state + LastResult, no animation logic yet.
+   - Key properties:
+       * ESOTS_ParkourState ParkourState
+           - Idle, Entering, Active, Exiting.
+       * ESOTS_ClimbStyle CurrentClimbStyle
+       * ESOTS_ParkourAction CurrentAction
+       * FSOTS_ParkourResult LastResult
+       * USOTS_ParkourConfig* ParkourConfig (optional)
+       * bool bEnableDebugLogging
+
+   - Important notes:
+       * No tick on the component.
+       * No GASP/motion matching/root motion yet – just warps.
+       * Movement-mode gating is deliberately minimal right now.
+       * Designed to be extended with OmniTrace/anchors later.
+
+2) USOTS_ParkourConfig (DataAsset)
+   - Data-driven tuning for the simple detect/execute flow.
+   - Fields (all EditAnywhere):
+       * Detection:
+           - float ForwardTraceDistance
+           - float TraceVerticalOffset
+       * Classification thresholds:
+           - float MantleMinHeight
+           - float MantleMaxHeight
+           - float MaxSafeDropHeight
+       * Execution offsets:
+           - float MantleForwardOffsetScale
+           - float MantleUpOffsetScale
+           - float DropStepDownDistance
+   - Constructor values mirror the original hard-coded defaults so
+     behavior is identical the moment you assign a config.
+
+3) USOTS_ParkourBridgeLibrary (BlueprintFunctionLibrary)
+   - Thin, read-only bridge for other SOTS plugins (TagManager, GSM,
+     MissionDirector, Stats, etc.).
+   - Functions:
+       * FName GetParkourStateLabel(const USOTS_ParkourComponent* Comp)
+           - Uses StaticEnum<ESOTS_ParkourState>().
+       * FName GetParkourActionLabel(const USOTS_ParkourComponent* Comp)
+           - Uses Comp->GetLastResult().Action + StaticEnum<ESOTS_ParkourAction>().
+       * bool HasValidParkourResult(const USOTS_ParkourComponent* Comp)
+           - Returns Comp->GetLastResult().bHasResult.
+   - Intent:
+       * Do NOT embed TagManager logic here.
+       * Other plugins convert these labels into tags/metrics/conditions.
+
+4) USOTS_ParkourDebugLibrary (BlueprintFunctionLibrary)
+   - Lightweight debug helpers:
+       * void DrawParkourResult(const UObject* WorldContextObject,
+                                const FSOTS_ParkourResult& Result,
+                                float Duration = 2.0f,
+                                float Thickness = 1.5f)
+           - DrawDebugSphere + DrawDebugLine for Result.WorldLocation/WorldNormal.
+           - No-op if Result.bHasResult == false.
+           - Wrapped in !(UE_BUILD_SHIPPING || UE_BUILD_TEST).
+       * FString DescribeParkourResult(const USOTS_ParkourComponent* Comp)
+           - Returns:
+               "HasResult=true; Action=...; ClimbStyle=...; Loc=X=...,Y=...,Z=..."
+             or empty string if Comp/result invalid.
+       * void LogParkourResultToScreen(const USOTS_ParkourComponent* Comp,
+                                       float Duration = 2.0f,
+                                       int32 Key = 0)
+           - Uses DescribeParkourResult() + GEngine->AddOnScreenDebugMessage.
+           - Includes owner name.
+           - Wrapped in !(UE_BUILD_SHIPPING || UE_BUILD_TEST).
+       * void LogParkourResultToLog(const USOTS_ParkourComponent* Comp)
+           - Uses DescribeParkourResult() + UE_LOG(LogTemp, Log, ...).
+           - Includes owner name.
+           - Wrapped in !(UE_BUILD_SHIPPING || UE_BUILD_TEST).
+
+Module glue
+-----------
+
+- SOTS_Parkour.Build.cs
+   - Public deps: Core, CoreUObject, Engine.
+   - Private deps: DeveloperSettings (for UDeveloperSettings-based settings, future use).
+
+----------------------------------------------------------------------
+2. How to wire this into a character (current state)
+----------------------------------------------------------------------
+
+Step 1 – Add the component
+--------------------------
+
+1) In your ACharacter Blueprint (e.g. BP_SOTS_Player child):
+   - Add a component:
+       * Type: SOTS_ParkourComponent
+       * Name: SOTS_ParkourComponent (or similar).
+
+2) Optionally expose it in C++:
+   - If you want to reference it from C++:
+       UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="SOTS|Parkour")
+       TObjectPtr<USOTS_ParkourComponent> ParkourComponent;
+
+Step 2 – Create and assign a config asset
+-----------------------------------------
+
+1) In Content Browser:
+   - Right-click → Miscellaneous → Data Asset.
+   - Pick: SOTS_ParkourConfig.
+   - Name it something like:
+       /Game/SOTS/Parkour/DA_ParkourConfig_Default
+
+2) Open the asset and tune:
+   - ForwardTraceDistance:
+       * How far in front of the character to look for ledges.
+   - TraceVerticalOffset:
+       * How high above the actor origin to trace (roughly chest height).
+   - MantleMinHeight / MantleMaxHeight:
+       * Range above the character’s feet considered mantle-able.
+   - MaxSafeDropHeight:
+       * How far below the feet is considered a “safe drop”.
+   - MantleForwardOffsetScale / MantleUpOffsetScale:
+       * Multipliers for capsule radius/half-height when placing the
+         character on top of the ledge.
+   - DropStepDownDistance:
+       * How far to move down for a simple “step off” drop.
+
+3) Assign on the component:
+   - Select your SOTS_ParkourComponent on the character Blueprint.
+   - Set:
+       * ParkourConfig = DA_ParkourConfig_Default (or your asset).
+       * bEnableDebugLogging = true (for initial tuning/QA).
+
+Step 3 – Hook up input (temporary)
+----------------------------------
+
+- For now, SPINE only expects a direct call to RequestParkour.
+- In your player input setup (Blueprint or C++):
+   - Bind an input action (e.g. Jump alternate, or a dev-only key).
+   - When pressed:
+       SOTS_ParkourComponent->RequestParkour();
+
+- Cancel:
+   - If you want a dev-only “force reset”:
+       SOTS_ParkourComponent->CancelParkour();
+
+Note:
+- Later phases will integrate with GASP / movement modes / OmniTrace
+  and may change when/how RequestParkour is called.
+- Current flow is intentionally simple to keep debugging/tracing obvious.
+
+----------------------------------------------------------------------
+3. How to use the bridge helpers
+----------------------------------------------------------------------
+
+In Blueprints (example)
+-----------------------
+
+- State label:
+    GetParkourStateLabel(ParkourComp)
+      -> FName like "ESOTS_ParkourState::Idle" or "ESOTS_ParkourState::Active"
+
+- Action label:
+    GetParkourActionLabel(ParkourComp)
+      -> FName like "ESOTS_ParkourAction::Mantle" or "ESOTS_ParkourAction::Drop"
+
+- Valid result:
+    HasValidParkourResult(ParkourComp)
+      -> bool, true if LastResult.bHasResult == true
+
+Intended usage:
+- TagManager / GSM / Stats / MissionDirector should:
+    * Call these helpers at key points (e.g. when a mission objective
+      listens for “perform any mantle”).
+    * Translate the FName labels into:
+        - Gameplay tags
+        - Mission condition IDs
+        - Telemetry/analytics keys
+
+No plugin is allowed to reach “through” the bridge to access internal
+SOTS_Parkour details directly. The bridge is the contract.
+
+----------------------------------------------------------------------
+4. How to use the debug helpers
+----------------------------------------------------------------------
+
+Basic onscreen debug – Blueprint
+--------------------------------
+
+Assume you have a reference to USOTS_ParkourComponent (ParkourComp):
+
+- Draw last result in the world:
+    DrawParkourResult(self, ParkourComp->GetLastResult(), 2.0, 1.5)
+
+- Show description onscreen:
+    LogParkourResultToScreen(ParkourComp, 2.0, 0)
+
+- Log description to Output Log:
+    LogParkourResultToLog(ParkourComp)
+
+Optional pattern:
+- In your SOTS_Debug plugin (or a dev-only cheat Blueprint), create an
+  input action that:
+    * Calls RequestParkour().
+    * Then immediately calls LogParkourResultToScreen/ToLog.
+  This makes quick tuning of DA_ParkourConfig_Default much easier.
+
+Remember:
+- All heavy debug work is wrapped in:
+    #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+  so you can safely leave debug paths in code without affecting Shipping.
+
+----------------------------------------------------------------------
+5. What’s intentionally NOT here yet
+----------------------------------------------------------------------
+
+Out of scope for this snapshot:
+--------------------------------
+
+- No OmniTrace / anchor system integration:
+    * The current forward trace is local-only and simple by design.
+    * Future passes will introduce OmniTrace-based bundles and proper
+      anchor selection, driven by TNT exports + DevTools.
+
+- No GASP / motion matching hooks:
+    * No custom montage/root-motion logic yet.
+    * Execution is a straightforward warp; animations are up to the
+      caller (for now).
+
+- No cover / stealth / GSM coupling:
+    * The ParkourComponent does not know about cover or stealth.
+    * GSM / AIPerception / TagManager remain the owners of stealth state.
+
+- No editor tools:
+    * TOOLS phase here only adds runtime debug libraries.
+    * Editor-only tooling and OmniTrace map diagnostics live in other
+      plugins and DevTools packs.
+
+----------------------------------------------------------------------
+6. Mental model summary
+----------------------------------------------------------------------
+
+Think of SOTS_Parkour at this snapshot as:
+
+- “A small, self-contained ledge detection + warp actor component…”
+- “…tuned by a single DataAsset…”
+- “…exposed to the rest of SOTS only through:
+      * a few stable enums,
+      * FName labels via the bridge library, and
+      * debug helpers for QA.”
+
+It is *not* the full TNT/OmniTrace system yet – it’s the clean, minimal
+runtime spine that future OmniTrace work will plug into.
+
+If you are reading this file inside another project:
+- Start here.
+- Add the component + config.
+- Use RequestParkour() and the debug helpers.
+- Only once this feels solid should you consider adding your own
+  OmniTrace/anchor layer on top.
